@@ -109,7 +109,7 @@ const defaultComponents = [
   }
 ];
 
-let components = JSON.parse(localStorage.getItem("adbInventory")) || defaultComponents;
+let components = loadStoredComponents();
 let isLoggedIn = false;
 
 const dashboardView = document.getElementById("dashboardView");
@@ -125,9 +125,22 @@ const logoHomeBtn = document.getElementById("logoHomeBtn");
 const categoryGrid = document.getElementById("categoryGrid");
 const componentGrid = document.getElementById("componentGrid");
 const inventoryTable = document.getElementById("inventoryTable");
-
 const searchInput = document.getElementById("searchInput");
 const stockFilter = document.getElementById("stockFilter");
+
+function loadStoredComponents() {
+  const saved = localStorage.getItem("adbInventory");
+
+  if (!saved) {
+    return [...defaultComponents];
+  }
+
+  try {
+    return JSON.parse(saved);
+  } catch {
+    return [...defaultComponents];
+  }
+}
 
 function saveData() {
   localStorage.setItem("adbInventory", JSON.stringify(components));
@@ -141,15 +154,28 @@ function refreshEverything() {
 }
 
 function getStatus(component) {
-  if (component.stock === 0) return "out";
-  if (component.stock < component.minimum) return "low";
+  if (Number(component.stock) === 0) {
+    return "out";
+  }
+
+  if (Number(component.stock) < Number(component.minimum)) {
+    return "low";
+  }
+
   return "good";
 }
 
 function getStatusLabel(component) {
   const status = getStatus(component);
-  if (status === "out") return "Out of Stock";
-  if (status === "low") return "Low Stock";
+
+  if (status === "out") {
+    return "Out of Stock";
+  }
+
+  if (status === "low") {
+    return "Low Stock";
+  }
+
   return "Healthy";
 }
 
@@ -187,11 +213,12 @@ function showView(viewName) {
 
 function renderCategories() {
   const categories = [...new Set(components.map(component => component.category))];
+
   categoryGrid.innerHTML = "";
 
   categories.forEach(category => {
     const items = components.filter(component => component.category === category);
-    const lowStockCount = items.filter(component => component.stock < component.minimum).length;
+    const lowStockCount = items.filter(component => Number(component.stock) < Number(component.minimum)).length;
     const types = [...new Set(items.map(component => component.type))];
 
     categoryGrid.innerHTML += `
@@ -285,7 +312,6 @@ function loadTable() {
 
     const matchesSearch = searchableText.includes(query);
     const status = getStatus(component);
-
     const matchesFilter = filter === "all" || filter === status;
 
     return matchesSearch && matchesFilter;
@@ -334,7 +360,10 @@ function renderAdminState() {
 
 function renderAdminList() {
   const adminList = document.getElementById("adminList");
-  if (!adminList) return;
+
+  if (!adminList || !isLoggedIn) {
+    return;
+  }
 
   adminList.innerHTML = "";
 
@@ -343,17 +372,19 @@ function renderAdminList() {
       <div class="admin-item">
         <div class="admin-item-header">
           <strong>${component.name}</strong>
-          <span class="status-badge ${getStatus(component)}">${getStatusLabel(component)}</span>
+          <span class="status-badge ${getStatus(component)}">
+            ${getStatusLabel(component)}
+          </span>
         </div>
 
-        <div class="admin-edit-row">
-          <input value="${component.name}" data-index="${index}" data-field="name">
-          <input value="${component.category}" data-index="${index}" data-field="category">
-          <input value="${component.type}" data-index="${index}" data-field="type">
-          <input value="${component.use}" data-index="${index}" data-field="use">
-          <input type="number" value="${component.stock}" data-index="${index}" data-field="stock">
-          <input type="number" value="${component.minimum}" data-index="${index}" data-field="minimum">
-          <input value="${component.location}" data-index="${index}" data-field="location">
+        <div class="admin-edit-grid">
+          <input value="${escapeHTML(component.name)}" data-index="${index}" data-field="name" />
+          <input value="${escapeHTML(component.category)}" data-index="${index}" data-field="category" />
+          <input value="${escapeHTML(component.type)}" data-index="${index}" data-field="type" />
+          <input value="${escapeHTML(component.use)}" data-index="${index}" data-field="use" />
+          <input type="number" value="${component.stock}" data-index="${index}" data-field="stock" />
+          <input type="number" value="${component.minimum}" data-index="${index}" data-field="minimum" />
+          <input value="${escapeHTML(component.location)}" data-index="${index}" data-field="location" />
           <button class="save-btn" data-index="${index}">Save</button>
           <button class="delete-btn" data-index="${index}">Delete</button>
         </div>
@@ -368,14 +399,17 @@ function renderAdminList() {
 
       inputs.forEach(input => {
         const field = input.dataset.field;
-        components[index][field] =
-          field === "stock" || field === "minimum"
-            ? Number(input.value)
-            : input.value;
+
+        if (field === "stock" || field === "minimum") {
+          components[index][field] = Number(input.value);
+        } else {
+          components[index][field] = input.value.trim();
+        }
       });
 
       saveData();
       refreshEverything();
+      renderAdminList();
     });
   });
 
@@ -384,51 +418,25 @@ function renderAdminList() {
       const index = Number(button.dataset.index);
       const confirmed = confirm(`Delete ${components[index].name}?`);
 
-      if (!confirmed) return;
+      if (!confirmed) {
+        return;
+      }
 
       components.splice(index, 1);
       saveData();
       refreshEverything();
+      renderAdminList();
     });
   });
 }
 
-document.getElementById("loginBtn").addEventListener("click", () => {
-  const password = document.getElementById("passwordInput").value;
-
-  if (password === "ADB") {
-    isLoggedIn = true;
-    document.getElementById("loginError").classList.add("hidden");
-    document.getElementById("passwordInput").value = "";
-    renderAdminState();
-  } else {
-    document.getElementById("loginError").classList.remove("hidden");
-  }
-});
-
-document.getElementById("logoutBtn").addEventListener("click", () => {
-  isLoggedIn = false;
-  renderAdminState();
-});
-
-document.getElementById("addForm").addEventListener("submit", event => {
-  event.preventDefault();
-
-  const newComponent = {
-    name: document.getElementById("newName").value,
-    category: document.getElementById("newCategory").value,
-    type: document.getElementById("newType").value,
-    use: document.getElementById("newUse").value,
-    stock: Number(document.getElementById("newStock").value),
-    minimum: Number(document.getElementById("newMinimum").value),
-    location: document.getElementById("newLocation").value
-  };
-
-  components.push(newComponent);
-  saveData();
-  event.target.reset();
-  refreshEverything();
-});
+function escapeHTML(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
 
 dashboardBtn.addEventListener("click", () => showView("dashboard"));
 logoHomeBtn.addEventListener("click", () => showView("dashboard"));
@@ -441,6 +449,50 @@ document.getElementById("backBtn").addEventListener("click", () => {
 
 searchInput.addEventListener("input", loadTable);
 stockFilter.addEventListener("change", loadTable);
+
+document.getElementById("loginBtn").addEventListener("click", () => {
+  const password = document.getElementById("passwordInput").value;
+
+  if (password === "ADB") {
+    isLoggedIn = true;
+    document.getElementById("passwordInput").value = "";
+    document.getElementById("loginError").classList.add("hidden");
+    renderAdminState();
+  } else {
+    document.getElementById("loginError").classList.remove("hidden");
+  }
+});
+
+document.getElementById("passwordInput").addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    document.getElementById("loginBtn").click();
+  }
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  isLoggedIn = false;
+  renderAdminState();
+});
+
+document.getElementById("addForm").addEventListener("submit", event => {
+  event.preventDefault();
+
+  const newComponent = {
+    name: document.getElementById("newName").value.trim(),
+    category: document.getElementById("newCategory").value.trim(),
+    type: document.getElementById("newType").value.trim(),
+    use: document.getElementById("newUse").value.trim(),
+    stock: Number(document.getElementById("newStock").value),
+    minimum: Number(document.getElementById("newMinimum").value),
+    location: document.getElementById("newLocation").value.trim()
+  };
+
+  components.push(newComponent);
+  saveData();
+  event.target.reset();
+  refreshEverything();
+  renderAdminList();
+});
 
 refreshEverything();
 showView("dashboard");
