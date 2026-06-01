@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADB Warehouse Dashboard</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <div class="logo">
+        ADB Warehouse Dashboard
+    </div>
+
+    <nav>
+        <button id="dashboardBtn">Dashboard</button>
+        <button id="inventoryBtn">All Components</button>
+    </nav>
+</header>
+
+<section class="hero">
+    <h1>Wireless Inventory Management</h1>
+    <p>Warehouse inventory, stock monitoring, and component reference.</p>
+</section>
+
+<main>
+
+    <section id="dashboardView">
+
+        <div class="category-grid">
+
+            <div class="category-card">
+                <h2>Fasteners</h2>
+
+                <ul>
+                    <li>Screws</li>
+                    <li>Bolts</li>
+                    <li>Washers</li>
+                    <li>Anchors</li>
+                </ul>
+
+                <button class="openCategory"
+                    data-category="Fasteners">
+                    View Components
+                </button>
+            </div>
+
+            <div class="category-card">
+                <h2>Power / AC</h2>
+
+                <ul>
+                    <li>AC Units</li>
+                    <li>Breakers</li>
+                    <li>Disconnects</li>
+                </ul>
+
+                <button class="openCategory"
+                    data-category="Power">
+                    View Components
+                </button>
+            </div>
+
+            <div class="category-card">
+                <h2>RF / Wireless</h2>
+
+                <ul>
+                    <li>Antennas</li>
+                    <li>Radios</li>
+                    <li>Jumpers</li>
+                </ul>
+
+                <button class="openCategory"
+                    data-category="RF">
+                    View Components
+                </button>
+            </div>
+
+        </div>
+    </section>
+
+    <section id="categoryView" class="hidden">
+
+        <button id="backBtn">
+            ← Back
+        </button>
+
+        <h2 id="categoryTitle"></h2>
+
+        <div id="componentGrid"
+             class="component-grid">
+        </div>
+
+    </section>
+
+    <section id="inventoryView" class="hidden">
+
+        <div class="inventory-controls">
+
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search components..."
+            >
+
+            <select id="stockFilter">
+
+                <option value="all">
+                    All Stock
+                </option>
+
+                <option value="low">
+                    Low Stock
+                </option>
+
+                <option value="good">
+                    Healthy Stock
+                </option>
+
+            </select>
+
+        </div>
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Type</th>
+                    <th>Stock</th>
+                    <th>Minimum</th>
+                    <th>Location</th>
+                </tr>
+            </thead>
+
+            <tbody id="inventoryTable"></tbody>
+
+        </table>
+
+    </section>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+</html>
