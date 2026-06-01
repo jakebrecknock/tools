@@ -28,7 +28,9 @@
   <div>
     <p class="eyebrow">Wireless Operations</p>
     <h1>Warehouse Inventory Dashboard</h1>
-    <p class="hero-copy">Find components, check stock, manage minimums, and update warehouse inventory.</p>
+    <p class="hero-copy">
+      A clean visual system for finding components, checking stock, and locating warehouse materials quickly.
+    </p>
   </div>
 
   <div class="hero-stat">
@@ -38,6 +40,7 @@
 </section>
 
 <main>
+
   <section id="dashboardView" class="view">
     <div class="section-heading">
       <div>
@@ -73,6 +76,7 @@
 
     <div class="inventory-controls">
       <input type="text" id="searchInput" placeholder="Search screw, AC, antenna, mount..." />
+
       <select id="stockFilter">
         <option value="all">All Stock</option>
         <option value="low">Low Stock</option>
@@ -103,7 +107,7 @@
     <div id="loginPanel" class="admin-card">
       <p class="eyebrow">Protected Area</p>
       <h2>Admin Login</h2>
-      <p class="muted">Enter the warehouse admin password to edit inventory.</p>
+      <p class="muted">Enter the admin password to edit warehouse inventory.</p>
 
       <div class="login-row">
         <input type="password" id="passwordInput" placeholder="Password" />
@@ -143,6 +147,7 @@
       </div>
     </div>
   </section>
+
 </main>
 
 <script src="app.js"></script>
