@@ -6,143 +6,106 @@
     <title>ADB Warehouse Dashboard</title>
 
     <link rel="stylesheet" href="style.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<header>
-    <div class="logo">
-        ADB Warehouse Dashboard
-    </div>
+<header class="topbar">
+    <button class="brand" id="logoHomeBtn" aria-label="Go to dashboard">
+        <img src="images/adb-logo.png" alt="ADB Logo" class="brand-logo" onerror="this.style.display='none'; document.querySelector('.brand-fallback').style.display='inline-flex';">
+        <span class="brand-fallback">ADB</span>
+        <span class="brand-text">Warehouse</span>
+    </button>
 
-    <nav>
-        <button id="dashboardBtn">Dashboard</button>
-        <button id="inventoryBtn">All Components</button>
+    <nav class="nav-actions">
+        <button id="dashboardBtn" class="nav-btn active">Dashboard</button>
+        <button id="inventoryBtn" class="nav-btn">All Components</button>
     </nav>
 </header>
 
 <section class="hero">
-    <h1>Wireless Inventory Management</h1>
-    <p>Warehouse inventory, stock monitoring, and component reference.</p>
+    <div>
+        <p class="eyebrow">Wireless Operations</p>
+        <h1>Warehouse Inventory Dashboard</h1>
+        <p class="hero-copy">
+            A clean visual system for finding components, checking stock, and locating warehouse materials quickly.
+        </p>
+    </div>
+
+    <div class="hero-stat">
+        <span id="totalParts">0</span>
+        <p>Total Components</p>
+    </div>
 </section>
 
 <main>
 
-    <section id="dashboardView">
-
-        <div class="category-grid">
-
-            <div class="category-card">
-                <h2>Fasteners</h2>
-
-                <ul>
-                    <li>Screws</li>
-                    <li>Bolts</li>
-                    <li>Washers</li>
-                    <li>Anchors</li>
-                </ul>
-
-                <button class="openCategory"
-                    data-category="Fasteners">
-                    View Components
-                </button>
+    <section id="dashboardView" class="view active-view">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Default View</p>
+                <h2>Component Sections</h2>
             </div>
-
-            <div class="category-card">
-                <h2>Power / AC</h2>
-
-                <ul>
-                    <li>AC Units</li>
-                    <li>Breakers</li>
-                    <li>Disconnects</li>
-                </ul>
-
-                <button class="openCategory"
-                    data-category="Power">
-                    View Components
-                </button>
-            </div>
-
-            <div class="category-card">
-                <h2>RF / Wireless</h2>
-
-                <ul>
-                    <li>Antennas</li>
-                    <li>Radios</li>
-                    <li>Jumpers</li>
-                </ul>
-
-                <button class="openCategory"
-                    data-category="RF">
-                    View Components
-                </button>
-            </div>
-
-        </div>
-    </section>
-
-    <section id="categoryView" class="hidden">
-
-        <button id="backBtn">
-            ← Back
-        </button>
-
-        <h2 id="categoryTitle"></h2>
-
-        <div id="componentGrid"
-             class="component-grid">
+            <p class="muted">Open a section to view image-based component cards.</p>
         </div>
 
+        <div id="categoryGrid" class="category-grid"></div>
     </section>
 
-    <section id="inventoryView" class="hidden">
+    <section id="categoryView" class="view hidden">
+        <div class="section-heading">
+            <div>
+                <button id="backBtn" class="back-btn">← Back to Dashboard</button>
+                <h2 id="categoryTitle"></h2>
+            </div>
+            <p class="muted">Images are placeholders until real warehouse photos are added.</p>
+        </div>
+
+        <div id="componentGrid" class="component-grid"></div>
+    </section>
+
+    <section id="inventoryView" class="view hidden">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Full List View</p>
+                <h2>All Components</h2>
+            </div>
+            <p class="muted">Search every item by name, category, type, use, or location.</p>
+        </div>
 
         <div class="inventory-controls">
-
-            <input
-                type="text"
-                id="searchInput"
-                placeholder="Search components..."
-            >
+            <input type="text" id="searchInput" placeholder="Search screw, AC, antenna, mount...">
 
             <select id="stockFilter">
-
-                <option value="all">
-                    All Stock
-                </option>
-
-                <option value="low">
-                    Low Stock
-                </option>
-
-                <option value="good">
-                    Healthy Stock
-                </option>
-
+                <option value="all">All Stock</option>
+                <option value="low">Low Stock</option>
+                <option value="good">Healthy Stock</option>
+                <option value="out">Out of Stock</option>
             </select>
-
         </div>
 
-        <table>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Category</th>
+                        <th>Type</th>
+                        <th>Stock</th>
+                        <th>Minimum</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
 
-            <thead>
-                <tr>
-                    <th>Component</th>
-                    <th>Type</th>
-                    <th>Stock</th>
-                    <th>Minimum</th>
-                    <th>Location</th>
-                </tr>
-            </thead>
-
-            <tbody id="inventoryTable"></tbody>
-
-        </table>
-
+                <tbody id="inventoryTable"></tbody>
+            </table>
+        </div>
     </section>
 
 </main>
 
 <script src="app.js"></script>
-
 </body>
 </html>
