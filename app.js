@@ -9,7 +9,9 @@ import {
   onSnapshot,
   serverTimestamp,
   query,
-  orderBy
+  orderBy,
+  setDoc,
+  getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { firebaseConfig } from "./firebase-config.js";
@@ -20,7 +22,38 @@ const db = getFirestore(app);
 const ADB_EMAIL_DOMAIN = "@adb-us.com";
 const ADMIN_PASSWORD = "ADB";
 
+const DEFAULT_TOOLS = {
+  spareTools: [
+    "Hammer Drill",
+    "Angle Grinder",
+    "Circular Saw",
+    "SDS Drill",
+    "Finish Nailer"
+  ],
+  safetyEquipment: [
+    "Harness",
+    "Hard Hat",
+    "Safety Glasses",
+    "Gloves",
+    "Traffic Cones"
+  ],
+  testingEquipment: [
+    "Cable Tester",
+    "Multimeter",
+    "Tone Generator",
+    "Fiber Tester",
+    "Signal Meter"
+  ]
+};
+
+const CATEGORY_LABELS = {
+  spareTools: "Spare Tools",
+  safetyEquipment: "Safety Equipment",
+  testingEquipment: "Testing Equipment"
+};
+
 let checkouts = [];
+let tools = [];
 let isLoggedIn = false;
 let pendingAction = null;
 
@@ -42,6 +75,12 @@ const statusFilter = document.getElementById("statusFilter");
 const phoneNumber = document.getElementById("phoneNumber");
 const expectedReturnDate = document.getElementById("expectedReturnDate");
 
+const selectedTool = document.getElementById("selectedTool");
+const selectedToolLabel = document.getElementById("selectedToolLabel");
+const spareToolsMenu = document.getElementById("spareToolsMenu");
+const safetyEquipmentMenu = document.getElementById("safetyEquipmentMenu");
+const testingEquipmentMenu = document.getElementById("testingEquipmentMenu");
+
 const verifyModal = document.getElementById("verifyModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
 const confirmVerifyBtn = document.getElementById("confirmVerifyBtn");
@@ -50,6 +89,11 @@ const verifyPhoneNumber = document.getElementById("verifyPhoneNumber");
 const verifyError = document.getElementById("verifyError");
 const extendDateWrap = document.getElementById("extendDateWrap");
 const newReturnDate = document.getElementById("newReturnDate");
+
+const addToolForm = document.getElementById("addToolForm");
+const newToolName = document.getElementById("newToolName");
+const newToolCategory = document.getElementById("newToolCategory");
+const adminToolsList = document.getElementById("adminToolsList");
 
 function setDefaultReturnDate() {
   const tomorrow = new Date();
@@ -60,13 +104,8 @@ function setDefaultReturnDate() {
 function formatPhone(value) {
   const digits = value.replace(/\D/g, "").slice(0, 10);
 
-  if (digits.length < 4) {
-    return digits;
-  }
-
-  if (digits.length < 7) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  }
+  if (digits.length < 4) return digits;
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
 
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
@@ -143,6 +182,120 @@ function showView(viewName) {
   }
 }
 
+async function seedDefaultToolsIfNeeded() {
+  const snapshot = await getDocs(collection(db, "tools"));
+
+  if (!snapshot.empty) return;
+
+  const writes = [];
+
+  Object.entries(DEFAULT_TOOLS).forEach(([category, names]) => {
+    names.forEach(name => {
+      const toolId = `${category}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+      writes.push(
+        setDoc(doc(db, "tools", toolId), {
+          name,
+          category,
+          createdAt: serverTimestamp()
+        })
+      );
+    });
+  });
+
+  await Promise.all(writes);
+}
+
+function renderToolDropdowns() {
+  const menus = {
+    spareTools: spareToolsMenu,
+    safetyEquipment: safetyEquipmentMenu,
+    testingEquipment: testingEquipmentMenu
+  };
+
+  Object.values(menus).forEach(menu => {
+    menu.innerHTML = "";
+  });
+
+  Object.keys(menus).forEach(category => {
+    const categoryTools = tools
+      .filter(tool => tool.category === category)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    if (categoryTools.length === 0) {
+      menus[category].innerHTML = `<button type="button" class="tool-option empty-tool" disabled>No tools yet</button>`;
+      return;
+    }
+
+    categoryTools.forEach(tool => {
+      menus[category].innerHTML += `
+        <button type="button" class="tool-option" data-tool="${escapeHTML(tool.name)}">
+          ${escapeHTML(tool.name)}
+        </button>
+      `;
+    });
+  });
+
+  document.querySelectorAll(".tool-option:not(.empty-tool)").forEach(button => {
+    button.addEventListener("click", () => {
+      selectedTool.value = button.dataset.tool;
+      selectedToolLabel.innerText = button.dataset.tool;
+      document.getElementById("toolPicker").classList.remove("open");
+    });
+  });
+}
+
+function renderAdminToolsList() {
+  if (!adminToolsList || !isLoggedIn) return;
+
+  adminToolsList.innerHTML = "";
+
+  if (tools.length === 0) {
+    adminToolsList.innerHTML = `
+      <div class="admin-item">
+        <div class="admin-item-header">
+          <strong>No tools added yet</strong>
+        </div>
+        <p class="muted">Add tools above to populate the checkout dropdown.</p>
+      </div>
+    `;
+    return;
+  }
+
+  Object.keys(CATEGORY_LABELS).forEach(category => {
+    const categoryTools = tools
+      .filter(tool => tool.category === category)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    adminToolsList.innerHTML += `
+      <div class="admin-tool-category">
+        <h4>${CATEGORY_LABELS[category]}</h4>
+        <div class="admin-tool-list">
+          ${
+            categoryTools.length === 0
+              ? `<p class="muted">No tools in this section.</p>`
+              : categoryTools.map(tool => `
+                  <div class="admin-tool-item">
+                    <span>${escapeHTML(tool.name)}</span>
+                    <button class="mini-delete-btn" data-tool-id="${tool.id}">Delete</button>
+                  </div>
+                `).join("")
+          }
+        </div>
+      </div>
+    `;
+  });
+
+  document.querySelectorAll(".mini-delete-btn").forEach(button => {
+    button.addEventListener("click", async () => {
+      const confirmed = confirm("Delete this tool from the dropdown?");
+      if (!confirmed) return;
+
+      await deleteDoc(doc(db, "tools", button.dataset.toolId));
+    });
+  });
+}
+
 function getActiveCheckouts() {
   return checkouts.filter(checkout => checkout.status === "out");
 }
@@ -152,6 +305,7 @@ function refreshEverything() {
   renderActiveCards();
   renderRecordsTable();
   renderEmailQueue();
+  renderAdminToolsList();
 }
 
 function renderActiveCards() {
@@ -193,7 +347,6 @@ function renderActiveCards() {
           <p><strong>Checked out by:</strong> ${escapeHTML(checkout.name)}</p>
           <p><strong>Email:</strong> ${escapeHTML(checkout.email)}</p>
           <p><strong>Phone:</strong> ${escapeHTML(checkout.phoneFormatted)}</p>
-          <p><strong>Job site:</strong> ${escapeHTML(checkout.jobSite)}</p>
           <p><strong>Expected return:</strong> ${formatDate(checkout.expectedReturnAt)}</p>
 
           <div class="tool-actions">
@@ -229,7 +382,6 @@ function renderRecordsTable() {
       ${checkout.email}
       ${checkout.phoneFormatted}
       ${checkout.tool}
-      ${checkout.jobSite}
       ${checkout.status}
     `.toLowerCase();
 
@@ -239,7 +391,7 @@ function renderRecordsTable() {
   recordsTable.innerHTML = "";
 
   if (filtered.length === 0) {
-    recordsTable.innerHTML = `<tr><td colspan="8">No checkout records found.</td></tr>`;
+    recordsTable.innerHTML = `<tr><td colspan="7">No checkout records found.</td></tr>`;
     return;
   }
 
@@ -250,7 +402,6 @@ function renderRecordsTable() {
         <td>${escapeHTML(checkout.name)}</td>
         <td>${escapeHTML(checkout.email)}</td>
         <td>${escapeHTML(checkout.phoneFormatted)}</td>
-        <td>${escapeHTML(checkout.jobSite)}</td>
         <td>${formatDateTime(checkout.checkedOutAt)}</td>
         <td>${formatDateTime(checkout.expectedReturnAt)}</td>
         <td>
@@ -301,10 +452,7 @@ async function confirmVerifiedAction() {
   const typedEmail = getFullEmail(verifyEmailPrefix.value);
   const typedPhone = phoneDigits(verifyPhoneNumber.value);
 
-  const emailMatches = typedEmail === checkout.email;
-  const phoneMatches = typedPhone === checkout.phoneDigits;
-
-  if (!emailMatches || !phoneMatches) {
+  if (typedEmail !== checkout.email || typedPhone !== checkout.phoneDigits) {
     verifyError.classList.remove("hidden");
     return;
   }
@@ -337,6 +485,7 @@ function renderAdminState() {
 
   if (isLoggedIn) {
     renderEmailQueue();
+    renderAdminToolsList();
   }
 }
 
@@ -399,11 +548,10 @@ checkoutForm.addEventListener("submit", async event => {
   const emailPrefix = document.getElementById("emailPrefix").value.trim();
   const phoneFormatted = formatPhone(phoneNumber.value);
   const digits = phoneDigits(phoneNumber.value);
-  const tool = document.getElementById("toolName").value.trim();
-  const jobSite = document.getElementById("jobSite").value.trim();
+  const tool = selectedTool.value.trim();
 
-  if (!name || !emailPrefix || digits.length !== 10 || !tool || !jobSite || !expectedReturnDate.value) {
-    alert("Please complete every field. Phone number must be 10 digits.");
+  if (!name || !emailPrefix || digits.length !== 10 || !tool || !expectedReturnDate.value) {
+    alert("Please complete every field. Phone number must be 10 digits and a tool must be selected.");
     return;
   }
 
@@ -413,7 +561,6 @@ checkoutForm.addEventListener("submit", async event => {
     phoneFormatted,
     phoneDigits: digits,
     tool,
-    jobSite,
     checkedOutAt: makeCheckoutDate(),
     expectedReturnAt: makeReturnDate(expectedReturnDate.value),
     status: "out",
@@ -425,7 +572,26 @@ checkoutForm.addEventListener("submit", async event => {
   });
 
   checkoutForm.reset();
+  selectedTool.value = "";
+  selectedToolLabel.innerText = "Select a tool";
   setDefaultReturnDate();
+});
+
+addToolForm.addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const name = newToolName.value.trim();
+  const category = newToolCategory.value;
+
+  if (!name || !category) return;
+
+  await addDoc(collection(db, "tools"), {
+    name,
+    category,
+    createdAt: serverTimestamp()
+  });
+
+  addToolForm.reset();
 });
 
 dashboardBtn.addEventListener("click", () => showView("dashboard"));
@@ -474,6 +640,19 @@ document.getElementById("clearReturnedBtn").addEventListener("click", async () =
   }
 });
 
+document.addEventListener("click", event => {
+  const picker = document.getElementById("toolPicker");
+  if (!picker) return;
+
+  if (!picker.contains(event.target)) {
+    picker.classList.remove("open");
+  }
+});
+
+document.getElementById("toolPickerMain").addEventListener("click", () => {
+  document.getElementById("toolPicker").classList.toggle("open");
+});
+
 onSnapshot(query(collection(db, "checkouts"), orderBy("createdAt", "desc")), snapshot => {
   checkouts = snapshot.docs.map(item => ({
     id: item.id,
@@ -483,5 +662,16 @@ onSnapshot(query(collection(db, "checkouts"), orderBy("createdAt", "desc")), sna
   refreshEverything();
 });
 
+onSnapshot(query(collection(db, "tools"), orderBy("createdAt", "asc")), snapshot => {
+  tools = snapshot.docs.map(item => ({
+    id: item.id,
+    ...item.data()
+  }));
+
+  renderToolDropdowns();
+  renderAdminToolsList();
+});
+
+seedDefaultToolsIfNeeded();
 setDefaultReturnDate();
 showView("dashboard");
