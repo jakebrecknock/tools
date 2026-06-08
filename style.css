@@ -212,17 +212,22 @@ main {
   border-radius: 24px;
   padding: 24px;
   box-shadow: var(--shadow);
+  overflow: visible;
 }
 
 .checkout-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 14px;
+  gap: 16px;
+  align-items: end;
 }
 
 .checkout-form input,
 .email-row input,
-.date-field input {
+.date-field input,
+.tool-picker-main,
+.admin-tool-form input,
+.admin-tool-form select {
   height: 52px;
   border: 1px solid var(--border);
   background: white;
@@ -240,7 +245,9 @@ main {
 .inventory-controls input:focus,
 .inventory-controls select:focus,
 .login-row input:focus,
-.modal-form input:focus {
+.modal-form input:focus,
+.admin-tool-form input:focus,
+.admin-tool-form select:focus {
   border-color: var(--orange);
   box-shadow: 0 0 0 4px rgba(255, 107, 0, 0.12);
 }
@@ -274,16 +281,136 @@ main {
   white-space: nowrap;
 }
 
-.date-field {
+.date-field,
+.tool-picker-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.date-field label {
+.date-field label,
+.tool-picker-field label {
   color: var(--muted);
   font-size: 13px;
   font-weight: 900;
+}
+
+.tool-picker {
+  position: relative;
+  z-index: 20;
+}
+
+.tool-picker-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.tool-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 100%;
+  min-width: 280px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(17, 24, 39, 0.16);
+  padding: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: 0.18s ease;
+}
+
+.tool-picker:hover .tool-menu,
+.tool-picker.open .tool-menu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.tool-category {
+  position: relative;
+}
+
+.tool-category-btn {
+  width: 100%;
+  border: none;
+  background: #f9fafb;
+  color: var(--text);
+  padding: 13px 14px;
+  border-radius: 13px;
+  text-align: left;
+  font-weight: 900;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.tool-category-btn::after {
+  content: "›";
+  float: right;
+  color: var(--orange);
+  font-size: 20px;
+  line-height: 14px;
+}
+
+.tool-category:hover .tool-category-btn {
+  background: #fff3eb;
+  color: var(--orange-dark);
+}
+
+.tool-submenu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 8px);
+  min-width: 230px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(17, 24, 39, 0.16);
+  padding: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-6px);
+  transition: 0.18s ease;
+}
+
+.tool-category:hover .tool-submenu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.tool-option {
+  width: 100%;
+  border: none;
+  background: white;
+  color: var(--text);
+  padding: 11px 12px;
+  border-radius: 12px;
+  text-align: left;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tool-option:hover {
+  background: var(--orange);
+  color: white;
+}
+
+.empty-tool {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.empty-tool:hover {
+  background: white;
+  color: var(--muted);
 }
 
 .checkout-form button {
@@ -475,7 +602,7 @@ main {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 920px;
+  min-width: 860px;
 }
 
 th {
@@ -537,7 +664,9 @@ tbody tr:hover {
 }
 
 .login-row button,
-.delete-btn {
+.delete-btn,
+.admin-tool-form button,
+.mini-delete-btn {
   border: none;
   border-radius: 12px;
   padding: 0 16px;
@@ -547,22 +676,26 @@ tbody tr:hover {
   transition: 0.2s ease;
 }
 
-.login-row button {
+.login-row button,
+.admin-tool-form button {
   background: var(--orange);
   color: white;
 }
 
-.login-row button:hover {
+.login-row button:hover,
+.admin-tool-form button:hover {
   background: var(--orange-dark);
   transform: translateY(-1px);
 }
 
-.delete-btn {
+.delete-btn,
+.mini-delete-btn {
   background: var(--danger);
   color: white;
 }
 
-.delete-btn:hover {
+.delete-btn:hover,
+.mini-delete-btn:hover {
   background: #991b1b;
   transform: translateY(-1px);
 }
@@ -573,12 +706,20 @@ tbody tr:hover {
   font-weight: 800;
 }
 
+.admin-tool-form {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
 .admin-list {
   display: grid;
   gap: 16px;
 }
 
-.admin-item {
+.admin-item,
+.admin-tool-category {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 16px;
@@ -586,7 +727,8 @@ tbody tr:hover {
   transition: 0.2s ease;
 }
 
-.admin-item:hover {
+.admin-item:hover,
+.admin-tool-category:hover {
   border-color: rgba(255, 107, 0, 0.35);
   box-shadow: 0 10px 24px rgba(17, 24, 39, 0.06);
 }
@@ -607,6 +749,34 @@ tbody tr:hover {
   font-size: 14px;
   line-height: 1.5;
   margin-bottom: 14px;
+}
+
+.admin-tool-category h4 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.admin-tool-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-tool-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--border);
+  padding: 10px;
+  border-radius: 14px;
+  font-weight: 800;
+}
+
+.mini-delete-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 
 .modal {
@@ -723,6 +893,12 @@ tbody tr:hover {
   .component-grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
+
+  .tool-submenu {
+    left: auto;
+    right: 0;
+    top: calc(100% + 8px);
+  }
 }
 
 @media (max-width: 760px) {
@@ -771,7 +947,8 @@ tbody tr:hover {
     align-items: stretch;
   }
 
-  .checkout-form {
+  .checkout-form,
+  .admin-tool-form {
     grid-template-columns: 1fr;
   }
 
@@ -787,12 +964,49 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
+  .tool-menu {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    margin-top: 10px;
+    display: none;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+
+  .tool-picker:hover .tool-menu,
+  .tool-picker.open .tool-menu {
+    display: block;
+  }
+
+  .tool-submenu {
+    position: static;
+    min-width: 0;
+    max-height: none;
+    margin: 8px 0 10px;
+    display: none;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    box-shadow: none;
+    border-radius: 12px;
+  }
+
+  .tool-category:hover .tool-submenu {
+    display: grid;
+  }
+
+  .tool-category-btn::after {
+    content: "↓";
+  }
+
   .table-wrap {
     border-radius: 16px;
   }
 
   table {
-    min-width: 900px;
+    min-width: 820px;
   }
 
   .modal {
