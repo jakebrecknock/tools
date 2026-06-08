@@ -34,11 +34,24 @@ const CATEGORY_LABELS = {
   testingEquipment: "Testing Equipment"
 };
 
+const CATEGORY_SHORT_LABELS = {
+  spareTools: "Spare",
+  safetyEquipment: "Safety",
+  testingEquipment: "Testing"
+};
+
+const CATEGORY_ICONS = {
+  spareTools: "🛠️",
+  safetyEquipment: "🦺",
+  testingEquipment: "📟"
+};
+
 let checkouts = [];
 let tools = [];
 let isLoggedIn = false;
 let pendingAction = null;
-let activeToolCategory = "spareTools";
+let activeToolCategory = "all";
+let toolSearchQuery = "";
 
 const dashboardView = document.getElementById("dashboardView");
 const recordsView = document.getElementById("recordsView");
@@ -60,7 +73,10 @@ const expectedReturnDate = document.getElementById("expectedReturnDate");
 
 const selectedTool = document.getElementById("selectedTool");
 const selectedToolLabel = document.getElementById("selectedToolLabel");
+const selectedToolCategoryLabel = document.getElementById("selectedToolCategoryLabel");
 const toolList = document.getElementById("toolList");
+const toolSearchInput = document.getElementById("toolSearchInput");
+const toolCountBadge = document.getElementById("toolCountBadge");
 
 const verifyModal = document.getElementById("verifyModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
@@ -185,31 +201,52 @@ async function seedDefaultToolsIfNeeded() {
   await Promise.all(writes);
 }
 
+function getVisibleTools() {
+  return tools
+    .filter(tool => {
+      const matchesCategory = activeToolCategory === "all" || tool.category === activeToolCategory;
+      const matchesSearch = tool.name.toLowerCase().includes(toolSearchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      if (a.category !== b.category) {
+        return CATEGORY_LABELS[a.category].localeCompare(CATEGORY_LABELS[b.category]);
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+}
+
 function renderToolPicker() {
   document.querySelectorAll(".tool-tab").forEach(tab => {
     tab.classList.toggle("active", tab.dataset.category === activeToolCategory);
   });
 
-  const categoryTools = tools
-    .filter(tool => tool.category === activeToolCategory)
-    .sort((a, b) => a.name.localeCompare(b.name));
-
+  const visibleTools = getVisibleTools();
+  toolCountBadge.innerText = `${visibleTools.length} ${visibleTools.length === 1 ? "tool" : "tools"}`;
   toolList.innerHTML = "";
 
-  if (categoryTools.length === 0) {
+  if (visibleTools.length === 0) {
     toolList.innerHTML = `
       <div class="empty-tool-message">
-        No tools added in ${CATEGORY_LABELS[activeToolCategory]} yet.
+        <strong>No tools found</strong>
+        <span>Try another category or search term.</span>
       </div>
     `;
     return;
   }
 
-  categoryTools.forEach(tool => {
+  visibleTools.forEach(tool => {
+    const isSelected = selectedTool.value === tool.name;
+
     toolList.innerHTML += `
-      <button type="button" class="tool-option" data-tool="${escapeHTML(tool.name)}">
-        <span>${escapeHTML(tool.name)}</span>
-        <small>${CATEGORY_LABELS[tool.category]}</small>
+      <button type="button" class="tool-option ${isSelected ? "selected" : ""}" data-tool="${escapeHTML(tool.name)}" data-category="${escapeHTML(tool.category)}">
+        <span class="tool-option-icon">${CATEGORY_ICONS[tool.category] || "🧰"}</span>
+        <span class="tool-option-copy">
+          <strong>${escapeHTML(tool.name)}</strong>
+          <small>${CATEGORY_LABELS[tool.category]}</small>
+        </span>
+        <span class="tool-option-check">${isSelected ? "✓" : ""}</span>
       </button>
     `;
   });
@@ -218,7 +255,9 @@ function renderToolPicker() {
     button.addEventListener("click", () => {
       selectedTool.value = button.dataset.tool;
       selectedToolLabel.innerText = button.dataset.tool;
+      selectedToolCategoryLabel.innerText = CATEGORY_LABELS[button.dataset.category] || "Selected tool";
       document.getElementById("toolPicker").classList.remove("open");
+      renderToolPicker();
     });
   });
 }
@@ -550,6 +589,11 @@ checkoutForm.addEventListener("submit", async event => {
   checkoutForm.reset();
   selectedTool.value = "";
   selectedToolLabel.innerText = "Select a tool";
+  selectedToolCategoryLabel.innerText = "Search or choose from a category";
+  toolSearchInput.value = "";
+  toolSearchQuery = "";
+  activeToolCategory = "all";
+  renderToolPicker();
   setDefaultReturnDate();
 });
 
@@ -575,6 +619,11 @@ document.querySelectorAll(".tool-tab").forEach(tab => {
     activeToolCategory = tab.dataset.category;
     renderToolPicker();
   });
+});
+
+toolSearchInput.addEventListener("input", () => {
+  toolSearchQuery = toolSearchInput.value.trim();
+  renderToolPicker();
 });
 
 dashboardBtn.addEventListener("click", () => showView("dashboard"));
@@ -634,6 +683,10 @@ document.addEventListener("click", event => {
 
 document.getElementById("toolPickerMain").addEventListener("click", () => {
   document.getElementById("toolPicker").classList.toggle("open");
+
+  if (document.getElementById("toolPicker").classList.contains("open")) {
+    setTimeout(() => toolSearchInput.focus(), 80);
+  }
 });
 
 onSnapshot(query(collection(db, "checkouts"), orderBy("createdAt", "desc")), snapshot => {
