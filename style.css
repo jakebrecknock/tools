@@ -309,44 +309,35 @@ main {
   cursor: pointer;
   color: var(--text);
   height: 62px;
-  padding: 0 14px;
+  padding: 0 16px;
+  background: #ffffff;
+  border: 1px solid var(--border);
 }
 
 .tool-picker-left {
   display: flex;
   align-items: center;
-  gap: 12px;
   min-width: 0;
-}
-
-.tool-picker-icon {
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff3eb;
-  border-radius: 12px;
-  flex: 0 0 auto;
 }
 
 .tool-picker-left strong {
   display: block;
-  max-width: 280px;
+  max-width: 320px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  color: var(--text);
 }
 
 .tool-picker-left small {
   display: block;
   color: var(--muted);
-  font-weight: 800;
-  margin-top: 2px;
+  font-weight: 700;
+  margin-top: 3px;
 }
 
 .tool-picker-arrow {
-  color: var(--orange);
+  color: #9ca3af;
   font-weight: 900;
   transition: 0.18s ease;
   flex: 0 0 auto;
@@ -364,7 +355,7 @@ main {
   background: white;
   border: 1px solid var(--border);
   border-radius: 22px;
-  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.2);
+  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.16);
   padding: 16px;
   opacity: 0;
   pointer-events: none;
@@ -392,9 +383,9 @@ main {
 }
 
 .tool-count-badge {
-  background: #fff3eb;
-  color: var(--orange-dark);
-  font-weight: 900;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-weight: 800;
   font-size: 12px;
   padding: 8px 10px;
   border-radius: 999px;
@@ -415,7 +406,7 @@ main {
 }
 
 .tool-search-wrap span {
-  color: var(--orange);
+  color: #9ca3af;
   font-weight: 900;
 }
 
@@ -425,7 +416,7 @@ main {
   background: transparent;
   flex: 1;
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   min-width: 0;
 }
 
@@ -440,20 +431,24 @@ main {
 .tool-tab {
   border: 1px solid var(--border);
   background: #f9fafb;
-  color: var(--text);
+  color: #374151;
   min-height: 40px;
   border-radius: 999px;
   padding: 0 14px;
-  font-weight: 900;
+  font-weight: 800;
   cursor: pointer;
   transition: 0.18s ease;
   white-space: nowrap;
 }
 
-.tool-tab:hover,
+.tool-tab:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
 .tool-tab.active {
-  background: var(--orange);
-  border-color: var(--orange);
+  background: var(--dark);
+  border-color: var(--dark);
   color: white;
 }
 
@@ -471,26 +466,16 @@ main {
   border: 1px solid var(--border);
   background: white;
   color: var(--text);
-  padding: 12px;
+  padding: 13px 14px;
   border-radius: 16px;
   text-align: left;
-  font-weight: 900;
+  font-weight: 800;
   cursor: pointer;
   display: grid;
-  grid-template-columns: 40px 1fr 26px;
+  grid-template-columns: 1fr auto;
   gap: 12px;
   align-items: center;
-  transition: 0.18s ease;
-}
-
-.tool-option-icon {
-  width: 40px;
-  height: 40px;
-  background: #f9fafb;
-  border-radius: 13px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  transition: 0.16s ease;
 }
 
 .tool-option-copy {
@@ -506,27 +491,26 @@ main {
 
 .tool-option-copy small {
   color: var(--muted);
-  font-weight: 800;
+  font-weight: 700;
   display: block;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .tool-option-check {
-  color: var(--orange);
+  color: var(--success);
+  font-size: 12px;
   font-weight: 900;
-  text-align: center;
+  text-align: right;
 }
 
-.tool-option:hover,
+.tool-option:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
 .tool-option.selected {
-  background: #fff3eb;
-  border-color: rgba(255, 107, 0, 0.5);
-  transform: translateY(-1px);
-}
-
-.tool-option.selected .tool-option-icon {
-  background: var(--orange);
-  color: white;
+  background: #f3f4f6;
+  border-color: #9ca3af;
 }
 
 .empty-tool-message {
@@ -1166,15 +1150,14 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
-  .tool-option {
-    grid-template-columns: 36px 1fr 20px;
-    gap: 10px;
-  }
+.tool-option {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
 
-  .tool-option-icon {
-    width: 36px;
-    height: 36px;
-  }
+.tool-option-check {
+  text-align: left;
+}
 
   .modal-card {
     margin-top: 20px;
