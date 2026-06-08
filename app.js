@@ -23,27 +23,9 @@ const ADB_EMAIL_DOMAIN = "@adb-us.com";
 const ADMIN_PASSWORD = "ADB";
 
 const DEFAULT_TOOLS = {
-  spareTools: [
-    "Hammer Drill",
-    "Angle Grinder",
-    "Circular Saw",
-    "SDS Drill",
-    "Finish Nailer"
-  ],
-  safetyEquipment: [
-    "Harness",
-    "Hard Hat",
-    "Safety Glasses",
-    "Gloves",
-    "Traffic Cones"
-  ],
-  testingEquipment: [
-    "Cable Tester",
-    "Multimeter",
-    "Tone Generator",
-    "Fiber Tester",
-    "Signal Meter"
-  ]
+  spareTools: ["Hammer Drill", "Angle Grinder", "Circular Saw", "SDS Drill", "Finish Nailer"],
+  safetyEquipment: ["Harness", "Hard Hat", "Safety Glasses", "Gloves", "Traffic Cones"],
+  testingEquipment: ["Cable Tester", "Multimeter", "Tone Generator", "Fiber Tester", "Signal Meter"]
 };
 
 const CATEGORY_LABELS = {
@@ -56,6 +38,7 @@ let checkouts = [];
 let tools = [];
 let isLoggedIn = false;
 let pendingAction = null;
+let activeToolCategory = "spareTools";
 
 const dashboardView = document.getElementById("dashboardView");
 const recordsView = document.getElementById("recordsView");
@@ -77,9 +60,7 @@ const expectedReturnDate = document.getElementById("expectedReturnDate");
 
 const selectedTool = document.getElementById("selectedTool");
 const selectedToolLabel = document.getElementById("selectedToolLabel");
-const spareToolsMenu = document.getElementById("spareToolsMenu");
-const safetyEquipmentMenu = document.getElementById("safetyEquipmentMenu");
-const testingEquipmentMenu = document.getElementById("testingEquipmentMenu");
+const toolList = document.getElementById("toolList");
 
 const verifyModal = document.getElementById("verifyModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
@@ -184,7 +165,6 @@ function showView(viewName) {
 
 async function seedDefaultToolsIfNeeded() {
   const snapshot = await getDocs(collection(db, "tools"));
-
   if (!snapshot.empty) return;
 
   const writes = [];
@@ -192,7 +172,6 @@ async function seedDefaultToolsIfNeeded() {
   Object.entries(DEFAULT_TOOLS).forEach(([category, names]) => {
     names.forEach(name => {
       const toolId = `${category}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-
       writes.push(
         setDoc(doc(db, "tools", toolId), {
           name,
@@ -206,37 +185,36 @@ async function seedDefaultToolsIfNeeded() {
   await Promise.all(writes);
 }
 
-function renderToolDropdowns() {
-  const menus = {
-    spareTools: spareToolsMenu,
-    safetyEquipment: safetyEquipmentMenu,
-    testingEquipment: testingEquipmentMenu
-  };
-
-  Object.values(menus).forEach(menu => {
-    menu.innerHTML = "";
+function renderToolPicker() {
+  document.querySelectorAll(".tool-tab").forEach(tab => {
+    tab.classList.toggle("active", tab.dataset.category === activeToolCategory);
   });
 
-  Object.keys(menus).forEach(category => {
-    const categoryTools = tools
-      .filter(tool => tool.category === category)
-      .sort((a, b) => a.name.localeCompare(b.name));
+  const categoryTools = tools
+    .filter(tool => tool.category === activeToolCategory)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-    if (categoryTools.length === 0) {
-      menus[category].innerHTML = `<button type="button" class="tool-option empty-tool" disabled>No tools yet</button>`;
-      return;
-    }
+  toolList.innerHTML = "";
 
-    categoryTools.forEach(tool => {
-      menus[category].innerHTML += `
-        <button type="button" class="tool-option" data-tool="${escapeHTML(tool.name)}">
-          ${escapeHTML(tool.name)}
-        </button>
-      `;
-    });
+  if (categoryTools.length === 0) {
+    toolList.innerHTML = `
+      <div class="empty-tool-message">
+        No tools added in ${CATEGORY_LABELS[activeToolCategory]} yet.
+      </div>
+    `;
+    return;
+  }
+
+  categoryTools.forEach(tool => {
+    toolList.innerHTML += `
+      <button type="button" class="tool-option" data-tool="${escapeHTML(tool.name)}">
+        <span>${escapeHTML(tool.name)}</span>
+        <small>${CATEGORY_LABELS[tool.category]}</small>
+      </button>
+    `;
   });
 
-  document.querySelectorAll(".tool-option:not(.empty-tool)").forEach(button => {
+  document.querySelectorAll(".tool-option").forEach(button => {
     button.addEventListener("click", () => {
       selectedTool.value = button.dataset.tool;
       selectedToolLabel.innerText = button.dataset.tool;
@@ -310,7 +288,6 @@ function refreshEverything() {
 
 function renderActiveCards() {
   const active = getActiveCheckouts();
-
   activeGrid.innerHTML = "";
 
   if (active.length === 0) {
@@ -494,7 +471,6 @@ function renderEmailQueue() {
   if (!emailQueue || !isLoggedIn) return;
 
   const active = getActiveCheckouts();
-
   emailQueue.innerHTML = "";
 
   if (active.length === 0) {
@@ -594,6 +570,13 @@ addToolForm.addEventListener("submit", async event => {
   addToolForm.reset();
 });
 
+document.querySelectorAll(".tool-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    activeToolCategory = tab.dataset.category;
+    renderToolPicker();
+  });
+});
+
 dashboardBtn.addEventListener("click", () => showView("dashboard"));
 logoHomeBtn.addEventListener("click", () => showView("dashboard"));
 recordsBtn.addEventListener("click", () => showView("records"));
@@ -668,7 +651,7 @@ onSnapshot(query(collection(db, "tools"), orderBy("createdAt", "asc")), snapshot
     ...item.data()
   }));
 
-  renderToolDropdowns();
+  renderToolPicker();
   renderAdminToolsList();
 });
 
