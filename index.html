@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ADB Warehouse Dashboard</title>
+  <title>ADB Tool Checkout</title>
   <link rel="stylesheet" href="style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
@@ -14,12 +14,12 @@
     <img src="images/adb-logo.png" alt="ADB Logo" class="brand-logo"
       onerror="this.style.display='none'; document.querySelector('.brand-fallback').style.display='inline-flex';">
     <span class="brand-fallback">ADB</span>
-    <span class="brand-text">Warehouse</span>
+    <span class="brand-text">Tool Checkout</span>
   </button>
 
   <nav class="nav-actions">
     <button id="dashboardBtn" class="nav-btn active">Dashboard</button>
-    <button id="inventoryBtn" class="nav-btn">All Components</button>
+    <button id="recordsBtn" class="nav-btn">Checkout Records</button>
     <button id="adminBtn" class="nav-btn">Admin</button>
   </nav>
 </header>
@@ -27,15 +27,15 @@
 <section class="hero">
   <div>
     <p class="eyebrow">Wireless Operations</p>
-    <h1>Warehouse Inventory Dashboard</h1>
+    <h1>Tool Checkout System</h1>
     <p class="hero-copy">
-      A clean visual system for finding components, checking stock, and locating warehouse materials quickly.
+      Quickly check out tools by entering your name, ADB email, tool, and job site.
     </p>
   </div>
 
   <div class="hero-stat">
-    <span id="totalParts">0</span>
-    <p>Total Components</p>
+    <span id="checkedOutCount">0</span>
+    <p>Tools Checked Out</p>
   </div>
 </section>
 
@@ -44,44 +44,55 @@
   <section id="dashboardView" class="view">
     <div class="section-heading">
       <div>
-        <p class="eyebrow">Default View</p>
-        <h2>Component Sections</h2>
+        <p class="eyebrow">Checkout</p>
+        <h2>Check Out a Tool</h2>
       </div>
-      <p class="muted">Open a section to view image-based component cards.</p>
+      <p class="muted">Email automatically finishes with @adb-us.com.</p>
     </div>
 
-    <div id="categoryGrid" class="category-grid"></div>
-  </section>
+    <div class="checkout-card">
+      <form id="checkoutForm" class="checkout-form">
+        <input id="workerName" placeholder="Your name" required />
 
-  <section id="categoryView" class="view hidden">
+        <div class="email-row">
+          <input id="emailPrefix" placeholder="email name" required />
+          <span>@adb-us.com</span>
+        </div>
+
+        <input id="toolName" placeholder="Tool being checked out" required />
+        <input id="jobSite" placeholder="Job site" required />
+
+        <button type="submit">Check Out Tool</button>
+      </form>
+    </div>
+
     <div class="section-heading">
       <div>
-        <button id="backBtn" class="back-btn">← Back to Dashboard</button>
-        <h2 id="categoryTitle"></h2>
+        <p class="eyebrow">Currently Out</p>
+        <h2>Active Checkouts</h2>
       </div>
-      <p class="muted">Images are placeholders until real warehouse photos are added.</p>
+      <p class="muted">Return tools as soon as they come back.</p>
     </div>
 
-    <div id="componentGrid" class="component-grid"></div>
+    <div id="activeGrid" class="component-grid"></div>
   </section>
 
-  <section id="inventoryView" class="view hidden">
+  <section id="recordsView" class="view hidden">
     <div class="section-heading">
       <div>
         <p class="eyebrow">Full List View</p>
-        <h2>All Components</h2>
+        <h2>Checkout Records</h2>
       </div>
-      <p class="muted">Search every item by name, category, type, use, or location.</p>
+      <p class="muted">Search by worker, email, tool, or job site.</p>
     </div>
 
     <div class="inventory-controls">
-      <input type="text" id="searchInput" placeholder="Search screw, AC, antenna, mount..." />
+      <input type="text" id="searchInput" placeholder="Search name, tool, job site..." />
 
-      <select id="stockFilter">
-        <option value="all">All Stock</option>
-        <option value="low">Low Stock</option>
-        <option value="good">Healthy Stock</option>
-        <option value="out">Out of Stock</option>
+      <select id="statusFilter">
+        <option value="all">All Records</option>
+        <option value="out">Checked Out</option>
+        <option value="returned">Returned</option>
       </select>
     </div>
 
@@ -89,16 +100,16 @@
       <table>
         <thead>
           <tr>
-            <th>Component</th>
-            <th>Category</th>
-            <th>Type</th>
-            <th>Stock</th>
-            <th>Minimum</th>
-            <th>Location</th>
+            <th>Tool</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Job Site</th>
+            <th>Checked Out</th>
+            <th>Expected Return</th>
             <th>Status</th>
           </tr>
         </thead>
-        <tbody id="inventoryTable"></tbody>
+        <tbody id="recordsTable"></tbody>
       </table>
     </div>
   </section>
@@ -107,7 +118,7 @@
     <div id="loginPanel" class="admin-card">
       <p class="eyebrow">Protected Area</p>
       <h2>Admin Login</h2>
-      <p class="muted">Enter the admin password to edit warehouse inventory.</p>
+      <p class="muted">Enter the admin password to view reminder queue and clear records.</p>
 
       <div class="login-row">
         <input type="password" id="passwordInput" placeholder="Password" />
@@ -120,30 +131,23 @@
     <div id="adminPanel" class="hidden">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">Inventory Editor</p>
-          <h2>Edit Components</h2>
+          <p class="eyebrow">Admin</p>
+          <h2>Tool Checkout Admin</h2>
         </div>
         <button id="logoutBtn" class="back-btn">Log Out</button>
       </div>
 
       <div class="admin-card">
-        <h3>Add New Component</h3>
-
-        <form id="addForm" class="admin-form">
-          <input id="newName" placeholder="Component name" required />
-          <input id="newCategory" placeholder="Category" required />
-          <input id="newType" placeholder="Type" required />
-          <input id="newUse" placeholder="Use / description" required />
-          <input id="newStock" type="number" placeholder="Stock" required />
-          <input id="newMinimum" type="number" placeholder="Minimum" required />
-          <input id="newLocation" placeholder="Warehouse location" required />
-          <button type="submit">Add Component</button>
-        </form>
+        <h3>Email Reminder Queue</h3>
+        <p class="admin-note">
+          This draft stores reminder events locally for now. Actual email sending will require the live database/backend step.
+        </p>
+        <div id="emailQueue" class="admin-list"></div>
       </div>
 
       <div class="admin-card">
-        <h3>Current Components</h3>
-        <div id="adminList" class="admin-list"></div>
+        <h3>Admin Actions</h3>
+        <button id="clearReturnedBtn" class="delete-btn">Clear Returned Records</button>
       </div>
     </div>
   </section>
