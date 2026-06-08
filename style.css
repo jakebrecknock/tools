@@ -297,7 +297,7 @@ main {
 
 .tool-picker {
   position: relative;
-  z-index: 20;
+  z-index: 30;
 }
 
 .tool-picker-main {
@@ -308,109 +308,109 @@ main {
   color: var(--text);
 }
 
+.tool-picker-arrow {
+  color: var(--orange);
+  font-weight: 900;
+  transition: 0.18s ease;
+}
+
+.tool-picker.open .tool-picker-arrow {
+  transform: rotate(180deg);
+}
+
 .tool-menu {
   position: absolute;
   top: calc(100% + 10px);
   left: 0;
-  width: 100%;
-  min-width: 280px;
+  width: min(520px, calc(100vw - 48px));
   background: white;
   border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: 0 20px 50px rgba(17, 24, 39, 0.16);
-  padding: 10px;
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.2);
+  padding: 14px;
   opacity: 0;
   pointer-events: none;
   transform: translateY(8px);
   transition: 0.18s ease;
 }
 
-.tool-picker:hover .tool-menu,
 .tool-picker.open .tool-menu {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
 }
 
-.tool-category {
-  position: relative;
+.tool-category-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.tool-category-btn {
-  width: 100%;
-  border: none;
+.tool-tab {
+  border: 1px solid var(--border);
   background: #f9fafb;
   color: var(--text);
-  padding: 13px 14px;
+  min-height: 42px;
   border-radius: 13px;
-  text-align: left;
+  padding: 8px 10px;
   font-weight: 900;
   cursor: pointer;
   transition: 0.18s ease;
 }
 
-.tool-category-btn::after {
-  content: "›";
-  float: right;
-  color: var(--orange);
-  font-size: 20px;
-  line-height: 14px;
+.tool-tab:hover,
+.tool-tab.active {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: white;
 }
 
-.tool-category:hover .tool-category-btn {
-  background: #fff3eb;
-  color: var(--orange-dark);
-}
-
-.tool-submenu {
-  position: absolute;
-  top: 0;
-  left: calc(100% + 8px);
-  min-width: 230px;
-  max-height: 280px;
+.tool-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: 290px;
   overflow-y: auto;
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 20px 50px rgba(17, 24, 39, 0.16);
-  padding: 8px;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-6px);
-  transition: 0.18s ease;
-}
-
-.tool-category:hover .tool-submenu {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateX(0);
+  padding-right: 4px;
 }
 
 .tool-option {
   width: 100%;
-  border: none;
+  border: 1px solid var(--border);
   background: white;
   color: var(--text);
-  padding: 11px 12px;
-  border-radius: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
   text-align: left;
-  font-weight: 800;
+  font-weight: 900;
   cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  transition: 0.18s ease;
+}
+
+.tool-option small {
+  color: var(--muted);
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .tool-option:hover {
-  background: var(--orange);
-  color: white;
+  background: #fff3eb;
+  border-color: rgba(255, 107, 0, 0.45);
+  color: var(--orange-dark);
 }
 
-.empty-tool {
+.empty-tool-message {
+  padding: 18px;
+  border-radius: 14px;
+  background: #f9fafb;
   color: var(--muted);
-  cursor: not-allowed;
-}
-
-.empty-tool:hover {
-  background: white;
-  color: var(--muted);
+  font-weight: 800;
+  text-align: center;
 }
 
 .checkout-form button {
@@ -893,12 +893,6 @@ tbody tr:hover {
   .component-grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
-
-  .tool-submenu {
-    left: auto;
-    right: 0;
-    top: calc(100% + 8px);
-  }
 }
 
 @media (max-width: 760px) {
@@ -965,40 +959,23 @@ tbody tr:hover {
   }
 
   .tool-menu {
-    position: static;
     width: 100%;
-    min-width: 0;
-    margin-top: 10px;
-    display: none;
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
+    max-width: none;
+    left: 0;
   }
 
-  .tool-picker:hover .tool-menu,
-  .tool-picker.open .tool-menu {
-    display: block;
+  .tool-category-tabs {
+    grid-template-columns: 1fr;
   }
 
-  .tool-submenu {
-    position: static;
-    min-width: 0;
-    max-height: none;
-    margin: 8px 0 10px;
-    display: none;
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
-    box-shadow: none;
-    border-radius: 12px;
+  .tool-list {
+    max-height: 250px;
   }
 
-  .tool-category:hover .tool-submenu {
-    display: grid;
-  }
-
-  .tool-category-btn::after {
-    content: "↓";
+  .tool-option {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .table-wrap {
