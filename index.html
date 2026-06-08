@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ADB Tool Checkout</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -19,7 +18,7 @@
 
   <nav class="nav-actions">
     <button id="dashboardBtn" class="nav-btn active">Dashboard</button>
-    <button id="recordsBtn" class="nav-btn">Checkout Records</button>
+    <button id="recordsBtn" class="nav-btn">Records</button>
     <button id="adminBtn" class="nav-btn">Admin</button>
   </nav>
 </header>
@@ -29,7 +28,7 @@
     <p class="eyebrow">Wireless Operations</p>
     <h1>Tool Checkout System</h1>
     <p class="hero-copy">
-      Quickly check out tools by entering your name, ADB email, tool, and job site.
+      Check out tools with your name, ADB email, phone number, tool, job site, and expected return date.
     </p>
   </div>
 
@@ -47,7 +46,7 @@
         <p class="eyebrow">Checkout</p>
         <h2>Check Out a Tool</h2>
       </div>
-      <p class="muted">Email automatically finishes with @adb-us.com.</p>
+      <p class="muted">Returns default to 5:00 PM on the selected date.</p>
     </div>
 
     <div class="checkout-card">
@@ -59,8 +58,14 @@
           <span>@adb-us.com</span>
         </div>
 
+        <input id="phoneNumber" placeholder="Phone number" maxlength="14" required />
         <input id="toolName" placeholder="Tool being checked out" required />
         <input id="jobSite" placeholder="Job site" required />
+
+        <div class="date-field">
+          <label for="expectedReturnDate">Expected return date</label>
+          <input id="expectedReturnDate" type="date" required />
+        </div>
 
         <button type="submit">Check Out Tool</button>
       </form>
@@ -71,7 +76,7 @@
         <p class="eyebrow">Currently Out</p>
         <h2>Active Checkouts</h2>
       </div>
-      <p class="muted">Return tools as soon as they come back.</p>
+      <p class="muted">Only the person who checked out a tool can return or extend it.</p>
     </div>
 
     <div id="activeGrid" class="component-grid"></div>
@@ -83,11 +88,11 @@
         <p class="eyebrow">Full List View</p>
         <h2>Checkout Records</h2>
       </div>
-      <p class="muted">Search by worker, email, tool, or job site.</p>
+      <p class="muted">Live records from Firebase.</p>
     </div>
 
     <div class="inventory-controls">
-      <input type="text" id="searchInput" placeholder="Search name, tool, job site..." />
+      <input type="text" id="searchInput" placeholder="Search name, email, phone, tool, job site..." />
 
       <select id="statusFilter">
         <option value="all">All Records</option>
@@ -103,6 +108,7 @@
             <th>Tool</th>
             <th>Name</th>
             <th>Email</th>
+            <th>Phone</th>
             <th>Job Site</th>
             <th>Checked Out</th>
             <th>Expected Return</th>
@@ -118,7 +124,7 @@
     <div id="loginPanel" class="admin-card">
       <p class="eyebrow">Protected Area</p>
       <h2>Admin Login</h2>
-      <p class="muted">Enter the admin password to view reminder queue and clear records.</p>
+      <p class="muted">Enter the admin password to view email status and admin actions.</p>
 
       <div class="login-row">
         <input type="password" id="passwordInput" placeholder="Password" />
@@ -138,9 +144,9 @@
       </div>
 
       <div class="admin-card">
-        <h3>Email Reminder Queue</h3>
+        <h3>Email Automation</h3>
         <p class="admin-note">
-          This draft stores reminder events locally for now. Actual email sending will require the live database/backend step.
+          Confirmation emails send immediately. Reminder emails are sent by Firebase Cloud Functions.
         </p>
         <div id="emailQueue" class="admin-list"></div>
       </div>
@@ -154,6 +160,33 @@
 
 </main>
 
-<script src="app.js"></script>
+<div id="verifyModal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closeModalBtn" class="modal-close">×</button>
+    <p class="eyebrow" id="modalEyebrow">Verify</p>
+    <h2 id="modalTitle">Verify Checkout</h2>
+    <p class="muted">Enter the same ADB email and phone number used at checkout.</p>
+
+    <div class="modal-form">
+      <div class="email-row">
+        <input id="verifyEmailPrefix" placeholder="email name" />
+        <span>@adb-us.com</span>
+      </div>
+
+      <input id="verifyPhoneNumber" placeholder="Phone number" maxlength="14" />
+
+      <div id="extendDateWrap" class="date-field hidden">
+        <label for="newReturnDate">New expected return date</label>
+        <input id="newReturnDate" type="date" />
+      </div>
+
+      <p id="verifyError" class="error-text hidden">That email or phone number does not match this checkout.</p>
+
+      <button id="confirmVerifyBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
 </body>
 </html>
