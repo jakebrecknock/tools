@@ -1,192 +1,50 @@
-const defaultComponents = [
-  {
-    name: "3/8 Stainless Bolt",
-    category: "Fasteners",
-    type: "Bolts",
-    use: "Mounting brackets and frame hardware",
-    stock: 12,
-    minimum: 25,
-    location: "Aisle 2 / Bin B4"
-  },
-  {
-    name: "Self-Tapping Screw Pack",
-    category: "Fasteners",
-    type: "Screws",
-    use: "General mounting and small hardware fastening",
-    stock: 44,
-    minimum: 50,
-    location: "Aisle 2 / Bin C1"
-  },
-  {
-    name: "Concrete Anchor Kit",
-    category: "Fasteners",
-    type: "Anchors",
-    use: "Securing mounts into concrete pads or walls",
-    stock: 31,
-    minimum: 20,
-    location: "Aisle 2 / Bin D2"
-  },
-  {
-    name: "AC Disconnect",
-    category: "Power / AC",
-    type: "Disconnects",
-    use: "Safely disconnecting site AC power during service",
-    stock: 6,
-    minimum: 5,
-    location: "Aisle 4 / Shelf A2"
-  },
-  {
-    name: "Outdoor AC Unit",
-    category: "Power / AC",
-    type: "AC Units",
-    use: "Cooling cabinets and equipment shelters",
-    stock: 2,
-    minimum: 4,
-    location: "Bulk Storage / Row 1"
-  },
-  {
-    name: "20A Breaker",
-    category: "Power / AC",
-    type: "Breakers",
-    use: "Electrical panel protection for wireless site circuits",
-    stock: 18,
-    minimum: 12,
-    location: "Aisle 4 / Bin C3"
-  },
-  {
-    name: "Antenna Mount",
-    category: "RF / Wireless",
-    type: "Mounts",
-    use: "Attaching antennas to tower or rooftop structures",
-    stock: 30,
-    minimum: 15,
-    location: "Aisle 1 / Rack B"
-  },
-  {
-    name: "Coax Jumper",
-    category: "RF / Wireless",
-    type: "Coax",
-    use: "Connecting radios, antennas, and RF equipment",
-    stock: 48,
-    minimum: 50,
-    location: "Aisle 3 / Bin A1"
-  },
-  {
-    name: "Remote Radio Head",
-    category: "RF / Wireless",
-    type: "Radios",
-    use: "Wireless signal transmission and receive equipment",
-    stock: 7,
-    minimum: 6,
-    location: "Secure Cage / Shelf 2"
-  },
-  {
-    name: "Fiber Jumper",
-    category: "Fiber / Data",
-    type: "Fiber",
-    use: "Connecting data equipment inside cabinets",
-    stock: 0,
-    minimum: 20,
-    location: "Aisle 5 / Bin F1"
-  },
-  {
-    name: "SFP Module",
-    category: "Fiber / Data",
-    type: "Data Modules",
-    use: "Network interface module for fiber connections",
-    stock: 14,
-    minimum: 10,
-    location: "Secure Cage / Drawer 3"
-  },
-  {
-    name: "Grounding Lug",
-    category: "Grounding",
-    type: "Grounding Hardware",
-    use: "Bonding equipment to grounding systems",
-    stock: 22,
-    minimum: 30,
-    location: "Aisle 6 / Bin G2"
-  }
-];
+const ADB_EMAIL_DOMAIN = "@adb-us.com";
+const ADMIN_PASSWORD = "ADB";
+const DEFAULT_LOAN_DAYS = 7;
 
-let components = loadStoredComponents();
+let checkouts = loadCheckouts();
 let isLoggedIn = false;
 
 const dashboardView = document.getElementById("dashboardView");
-const categoryView = document.getElementById("categoryView");
-const inventoryView = document.getElementById("inventoryView");
+const recordsView = document.getElementById("recordsView");
 const adminView = document.getElementById("adminView");
 
 const dashboardBtn = document.getElementById("dashboardBtn");
-const inventoryBtn = document.getElementById("inventoryBtn");
+const recordsBtn = document.getElementById("recordsBtn");
 const adminBtn = document.getElementById("adminBtn");
 const logoHomeBtn = document.getElementById("logoHomeBtn");
 
-const categoryGrid = document.getElementById("categoryGrid");
-const componentGrid = document.getElementById("componentGrid");
-const inventoryTable = document.getElementById("inventoryTable");
+const checkoutForm = document.getElementById("checkoutForm");
+const activeGrid = document.getElementById("activeGrid");
+const recordsTable = document.getElementById("recordsTable");
 const searchInput = document.getElementById("searchInput");
-const stockFilter = document.getElementById("stockFilter");
+const statusFilter = document.getElementById("statusFilter");
 
-function loadStoredComponents() {
-  const saved = localStorage.getItem("adbInventory");
+function loadCheckouts() {
+  const saved = localStorage.getItem("adbToolCheckouts");
 
   if (!saved) {
-    return [...defaultComponents];
+    return [];
   }
 
   try {
     return JSON.parse(saved);
   } catch {
-    return [...defaultComponents];
+    return [];
   }
 }
 
-function saveData() {
-  localStorage.setItem("adbInventory", JSON.stringify(components));
-}
-
-function refreshEverything() {
-  document.getElementById("totalParts").innerText = components.length;
-  renderCategories();
-  loadTable();
-  renderAdminList();
-}
-
-function getStatus(component) {
-  if (Number(component.stock) === 0) {
-    return "out";
-  }
-
-  if (Number(component.stock) < Number(component.minimum)) {
-    return "low";
-  }
-
-  return "good";
-}
-
-function getStatusLabel(component) {
-  const status = getStatus(component);
-
-  if (status === "out") {
-    return "Out of Stock";
-  }
-
-  if (status === "low") {
-    return "Low Stock";
-  }
-
-  return "Healthy";
+function saveCheckouts() {
+  localStorage.setItem("adbToolCheckouts", JSON.stringify(checkouts));
 }
 
 function showView(viewName) {
   dashboardView.classList.add("hidden");
-  categoryView.classList.add("hidden");
-  inventoryView.classList.add("hidden");
+  recordsView.classList.add("hidden");
   adminView.classList.add("hidden");
 
   dashboardBtn.classList.remove("active");
-  inventoryBtn.classList.remove("active");
+  recordsBtn.classList.remove("active");
   adminBtn.classList.remove("active");
 
   if (viewName === "dashboard") {
@@ -194,14 +52,10 @@ function showView(viewName) {
     dashboardBtn.classList.add("active");
   }
 
-  if (viewName === "category") {
-    categoryView.classList.remove("hidden");
-  }
-
-  if (viewName === "inventory") {
-    inventoryView.classList.remove("hidden");
-    inventoryBtn.classList.add("active");
-    loadTable();
+  if (viewName === "records") {
+    recordsView.classList.remove("hidden");
+    recordsBtn.classList.add("active");
+    renderRecordsTable();
   }
 
   if (viewName === "admin") {
@@ -211,140 +65,278 @@ function showView(viewName) {
   }
 }
 
-function renderCategories() {
-  const categories = [...new Set(components.map(component => component.category))];
+function getTodayAtSixAM() {
+  const date = new Date();
+  date.setHours(6, 0, 0, 0);
+  return date;
+}
 
-  categoryGrid.innerHTML = "";
+function getDefaultReturnDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + DEFAULT_LOAN_DAYS);
+  date.setHours(17, 0, 0, 0);
+  return date;
+}
 
-  categories.forEach(category => {
-    const items = components.filter(component => component.category === category);
-    const lowStockCount = items.filter(component => Number(component.stock) < Number(component.minimum)).length;
-    const types = [...new Set(items.map(component => component.type))];
+function formatDate(dateString) {
+  return new Date(dateString).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
 
-    categoryGrid.innerHTML += `
-      <article class="category-card">
-        <div class="category-top">
-          <h3>${category}</h3>
-          <span class="count-pill">${items.length} items</span>
+function formatDateTime(dateString) {
+  return new Date(dateString).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function cleanEmailPrefix(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(ADB_EMAIL_DOMAIN, "")
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
+function getFullEmail(prefix) {
+  return `${cleanEmailPrefix(prefix)}${ADB_EMAIL_DOMAIN}`;
+}
+
+function getActiveCheckouts() {
+  return checkouts.filter(checkout => checkout.status === "out");
+}
+
+function refreshEverything() {
+  document.getElementById("checkedOutCount").innerText = getActiveCheckouts().length;
+  renderActiveCards();
+  renderRecordsTable();
+  renderEmailQueue();
+}
+
+function renderActiveCards() {
+  const active = getActiveCheckouts();
+
+  activeGrid.innerHTML = "";
+
+  if (active.length === 0) {
+    activeGrid.innerHTML = `
+      <article class="component-card">
+        <div class="placeholder-image">
+          <div class="placeholder-box">
+            <div class="placeholder-icon">✅</div>
+            <div class="placeholder-label">No Active Checkouts</div>
+          </div>
         </div>
 
-        <ul>
-          ${types.slice(0, 5).map(type => `<li>${type}</li>`).join("")}
-        </ul>
+        <div class="component-info">
+          <h3>All tools are currently returned</h3>
+          <p>When someone checks out a tool, it will appear here.</p>
+        </div>
+      </article>
+    `;
+    return;
+  }
 
-        <div class="category-meta">
-          <span class="meta-chip">${items.reduce((sum, item) => sum + Number(item.stock), 0)} units in stock</span>
-          <span class="meta-chip ${lowStockCount > 0 ? "low" : ""}">${lowStockCount} low-stock</span>
+  active.forEach(checkout => {
+    activeGrid.innerHTML += `
+      <article class="component-card">
+        <div class="placeholder-image">
+          <div class="placeholder-box">
+            <div class="placeholder-icon">🧰</div>
+            <div class="placeholder-label">${escapeHTML(checkout.tool)}</div>
+          </div>
         </div>
 
-        <button class="openCategory" data-category="${category}">
-          View Components
-        </button>
+        <div class="component-info">
+          <h3>${escapeHTML(checkout.tool)}</h3>
+          <p><strong>Checked out by:</strong> ${escapeHTML(checkout.name)}</p>
+          <p><strong>Email:</strong> ${escapeHTML(checkout.email)}</p>
+          <p><strong>Job site:</strong> ${escapeHTML(checkout.jobSite)}</p>
+          <p><strong>Expected return:</strong> ${formatDate(checkout.expectedReturnAt)}</p>
+
+          <div class="status-row">
+            <span class="status-badge out">Checked Out</span>
+          </div>
+
+          <button class="return-btn" data-id="${checkout.id}">
+            Mark Returned
+          </button>
+        </div>
       </article>
     `;
   });
 
-  document.querySelectorAll(".openCategory").forEach(button => {
+  document.querySelectorAll(".return-btn").forEach(button => {
     button.addEventListener("click", () => {
-      showCategory(button.dataset.category);
+      markReturned(button.dataset.id);
     });
   });
 }
 
-function showCategory(category) {
-  showView("category");
+function renderRecordsTable() {
+  if (!recordsTable) {
+    return;
+  }
 
-  document.getElementById("categoryTitle").innerText = category;
-  componentGrid.innerHTML = "";
-
-  components
-    .filter(component => component.category === category)
-    .forEach(component => {
-      const status = getStatus(component);
-
-      componentGrid.innerHTML += `
-        <article class="component-card">
-          <div class="placeholder-image">
-            <div class="placeholder-box">
-              <div class="placeholder-icon">${getIcon(component.category)}</div>
-              <div class="placeholder-label">${component.type}</div>
-            </div>
-          </div>
-
-          <div class="component-info">
-            <h3>${component.name}</h3>
-            <p>${component.use}</p>
-            <p><strong>Location:</strong> ${component.location}</p>
-
-            <div class="status-row">
-              <p><strong>${component.stock}</strong> in stock</p>
-              <span class="status-badge ${status}">
-                ${getStatusLabel(component)}
-              </span>
-            </div>
-          </div>
-        </article>
-      `;
-    });
-}
-
-function getIcon(category) {
-  if (category.includes("Fasteners")) return "🔩";
-  if (category.includes("Power")) return "⚡";
-  if (category.includes("RF")) return "📡";
-  if (category.includes("Fiber")) return "🔌";
-  if (category.includes("Grounding")) return "⏚";
-  return "📦";
-}
-
-function loadTable() {
   const query = searchInput.value.toLowerCase().trim();
-  const filter = stockFilter.value;
+  const filter = statusFilter.value;
 
-  const filteredComponents = components.filter(component => {
+  const filtered = checkouts.filter(checkout => {
     const searchableText = `
-      ${component.name}
-      ${component.category}
-      ${component.type}
-      ${component.use}
-      ${component.location}
+      ${checkout.name}
+      ${checkout.email}
+      ${checkout.tool}
+      ${checkout.jobSite}
+      ${checkout.status}
     `.toLowerCase();
 
     const matchesSearch = searchableText.includes(query);
-    const status = getStatus(component);
-    const matchesFilter = filter === "all" || filter === status;
+    const matchesStatus = filter === "all" || checkout.status === filter;
 
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesStatus;
   });
 
-  inventoryTable.innerHTML = "";
+  recordsTable.innerHTML = "";
 
-  if (filteredComponents.length === 0) {
-    inventoryTable.innerHTML = `
+  if (filtered.length === 0) {
+    recordsTable.innerHTML = `
       <tr>
-        <td colspan="7">No components match your search.</td>
+        <td colspan="7">No checkout records found.</td>
       </tr>
     `;
     return;
   }
 
-  filteredComponents.forEach(component => {
-    const status = getStatus(component);
+  filtered
+    .sort((a, b) => new Date(b.checkedOutAt) - new Date(a.checkedOutAt))
+    .forEach(checkout => {
+      recordsTable.innerHTML += `
+        <tr>
+          <td>${escapeHTML(checkout.tool)}</td>
+          <td>${escapeHTML(checkout.name)}</td>
+          <td>${escapeHTML(checkout.email)}</td>
+          <td>${escapeHTML(checkout.jobSite)}</td>
+          <td>${formatDateTime(checkout.checkedOutAt)}</td>
+          <td>${formatDateTime(checkout.expectedReturnAt)}</td>
+          <td>
+            <span class="status-badge ${checkout.status === "out" ? "out" : "good"}">
+              ${checkout.status === "out" ? "Checked Out" : "Returned"}
+            </span>
+          </td>
+        </tr>
+      `;
+    });
+}
 
-    inventoryTable.innerHTML += `
-      <tr class="${status === "low" || status === "out" ? "low-stock" : ""}">
-        <td>${component.name}</td>
-        <td>${component.category}</td>
-        <td>${component.type}</td>
-        <td>${component.stock}</td>
-        <td>${component.minimum}</td>
-        <td>${component.location}</td>
-        <td>
-          <span class="status-badge ${status}">
-            ${getStatusLabel(component)}
-          </span>
-        </td>
-      </tr>
+function markReturned(id) {
+  const checkout = checkouts.find(item => item.id === id);
+
+  if (!checkout) {
+    return;
+  }
+
+  checkout.status = "returned";
+  checkout.returnedAt = new Date().toISOString();
+
+  saveCheckouts();
+  refreshEverything();
+}
+
+function createReminderQueue(checkout) {
+  const expectedReturn = new Date(checkout.expectedReturnAt);
+
+  const twentyFourHourReminder = new Date(expectedReturn);
+  twentyFourHourReminder.setDate(twentyFourHourReminder.getDate() - 1);
+  twentyFourHourReminder.setHours(17, 0, 0, 0);
+
+  const finalReminder = new Date(expectedReturn);
+  finalReminder.setHours(6, 0, 0, 0);
+
+  const escalation = new Date(expectedReturn);
+  escalation.setDate(escalation.getDate() + 1);
+  escalation.setHours(6, 0, 0, 0);
+
+  return [
+    {
+      type: "24 Hour Reminder",
+      sendAt: twentyFourHourReminder.toISOString(),
+      to: checkout.email,
+      cc: "",
+      subject: `REMINDER: 24 hours to return ${checkout.tool}`,
+      body: `REMINDER: 24 hours to return "${checkout.tool}" or check out for longer.`
+    },
+    {
+      type: "Final Reminder",
+      sendAt: finalReminder.toISOString(),
+      to: checkout.email,
+      cc: "",
+      subject: `FINAL REMINDER: ${checkout.tool} is due today`,
+      body: `FINAL REMINDER: "${checkout.tool}" is due back today by 5:00 PM.`
+    },
+    {
+      type: "Escalation",
+      sendAt: escalation.toISOString(),
+      to: checkout.email,
+      cc: `ajkwasek${ADB_EMAIL_DOMAIN}, nharbacek${ADB_EMAIL_DOMAIN}`,
+      subject: `OVERDUE TOOL: ${checkout.tool}`,
+      body: `"${checkout.tool}" was not returned by the expected deadline. Please return it immediately or update the checkout.`
+    }
+  ];
+}
+
+function getQueuedEmails() {
+  return getActiveCheckouts().flatMap(checkout => {
+    return createReminderQueue(checkout).map(email => ({
+      ...email,
+      checkoutId: checkout.id,
+      tool: checkout.tool,
+      worker: checkout.name
+    }));
+  });
+}
+
+function renderEmailQueue() {
+  const emailQueue = document.getElementById("emailQueue");
+
+  if (!emailQueue || !isLoggedIn) {
+    return;
+  }
+
+  const queuedEmails = getQueuedEmails();
+
+  emailQueue.innerHTML = "";
+
+  if (queuedEmails.length === 0) {
+    emailQueue.innerHTML = `
+      <div class="admin-item">
+        <div class="admin-item-header">
+          <strong>No reminder emails queued</strong>
+        </div>
+        <p class="muted">Emails will queue here after tools are checked out.</p>
+      </div>
+    `;
+    return;
+  }
+
+  queuedEmails.forEach(email => {
+    emailQueue.innerHTML += `
+      <div class="admin-item">
+        <div class="admin-item-header">
+          <strong>${escapeHTML(email.type)}</strong>
+          <span class="status-badge out">${formatDateTime(email.sendAt)}</span>
+        </div>
+        <p class="muted"><strong>Tool:</strong> ${escapeHTML(email.tool)}</p>
+        <p class="muted"><strong>Worker:</strong> ${escapeHTML(email.worker)}</p>
+        <p class="muted"><strong>To:</strong> ${escapeHTML(email.to)}</p>
+        ${email.cc ? `<p class="muted"><strong>CC:</strong> ${escapeHTML(email.cc)}</p>` : ""}
+        <p class="muted"><strong>Subject:</strong> ${escapeHTML(email.subject)}</p>
+      </div>
     `;
   });
 }
@@ -354,80 +346,8 @@ function renderAdminState() {
   document.getElementById("adminPanel").classList.toggle("hidden", !isLoggedIn);
 
   if (isLoggedIn) {
-    renderAdminList();
+    renderEmailQueue();
   }
-}
-
-function renderAdminList() {
-  const adminList = document.getElementById("adminList");
-
-  if (!adminList || !isLoggedIn) {
-    return;
-  }
-
-  adminList.innerHTML = "";
-
-  components.forEach((component, index) => {
-    adminList.innerHTML += `
-      <div class="admin-item">
-        <div class="admin-item-header">
-          <strong>${component.name}</strong>
-          <span class="status-badge ${getStatus(component)}">
-            ${getStatusLabel(component)}
-          </span>
-        </div>
-
-        <div class="admin-edit-grid">
-          <input value="${escapeHTML(component.name)}" data-index="${index}" data-field="name" />
-          <input value="${escapeHTML(component.category)}" data-index="${index}" data-field="category" />
-          <input value="${escapeHTML(component.type)}" data-index="${index}" data-field="type" />
-          <input value="${escapeHTML(component.use)}" data-index="${index}" data-field="use" />
-          <input type="number" value="${component.stock}" data-index="${index}" data-field="stock" />
-          <input type="number" value="${component.minimum}" data-index="${index}" data-field="minimum" />
-          <input value="${escapeHTML(component.location)}" data-index="${index}" data-field="location" />
-          <button class="save-btn" data-index="${index}">Save</button>
-          <button class="delete-btn" data-index="${index}">Delete</button>
-        </div>
-      </div>
-    `;
-  });
-
-  document.querySelectorAll(".save-btn").forEach(button => {
-    button.addEventListener("click", () => {
-      const index = Number(button.dataset.index);
-      const inputs = document.querySelectorAll(`[data-index="${index}"][data-field]`);
-
-      inputs.forEach(input => {
-        const field = input.dataset.field;
-
-        if (field === "stock" || field === "minimum") {
-          components[index][field] = Number(input.value);
-        } else {
-          components[index][field] = input.value.trim();
-        }
-      });
-
-      saveData();
-      refreshEverything();
-      renderAdminList();
-    });
-  });
-
-  document.querySelectorAll(".delete-btn").forEach(button => {
-    button.addEventListener("click", () => {
-      const index = Number(button.dataset.index);
-      const confirmed = confirm(`Delete ${components[index].name}?`);
-
-      if (!confirmed) {
-        return;
-      }
-
-      components.splice(index, 1);
-      saveData();
-      refreshEverything();
-      renderAdminList();
-    });
-  });
 }
 
 function escapeHTML(value) {
@@ -438,22 +358,49 @@ function escapeHTML(value) {
     .replaceAll(">", "&gt;");
 }
 
-dashboardBtn.addEventListener("click", () => showView("dashboard"));
-logoHomeBtn.addEventListener("click", () => showView("dashboard"));
-inventoryBtn.addEventListener("click", () => showView("inventory"));
-adminBtn.addEventListener("click", () => showView("admin"));
+checkoutForm.addEventListener("submit", event => {
+  event.preventDefault();
 
-document.getElementById("backBtn").addEventListener("click", () => {
-  showView("dashboard");
+  const name = document.getElementById("workerName").value.trim();
+  const emailPrefix = document.getElementById("emailPrefix").value.trim();
+  const tool = document.getElementById("toolName").value.trim();
+  const jobSite = document.getElementById("jobSite").value.trim();
+
+  if (!name || !emailPrefix || !tool || !jobSite) {
+    return;
+  }
+
+  const checkout = {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    name,
+    email: getFullEmail(emailPrefix),
+    tool,
+    jobSite,
+    checkedOutAt: getTodayAtSixAM().toISOString(),
+    expectedReturnAt: getDefaultReturnDate().toISOString(),
+    status: "out",
+    returnedAt: null
+  };
+
+  checkouts.push(checkout);
+  saveCheckouts();
+
+  checkoutForm.reset();
+  refreshEverything();
 });
 
-searchInput.addEventListener("input", loadTable);
-stockFilter.addEventListener("change", loadTable);
+dashboardBtn.addEventListener("click", () => showView("dashboard"));
+logoHomeBtn.addEventListener("click", () => showView("dashboard"));
+recordsBtn.addEventListener("click", () => showView("records"));
+adminBtn.addEventListener("click", () => showView("admin"));
+
+searchInput.addEventListener("input", renderRecordsTable);
+statusFilter.addEventListener("change", renderRecordsTable);
 
 document.getElementById("loginBtn").addEventListener("click", () => {
   const password = document.getElementById("passwordInput").value;
 
-  if (password === "ADB") {
+  if (password === ADMIN_PASSWORD) {
     isLoggedIn = true;
     document.getElementById("passwordInput").value = "";
     document.getElementById("loginError").classList.add("hidden");
@@ -474,24 +421,16 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   renderAdminState();
 });
 
-document.getElementById("addForm").addEventListener("submit", event => {
-  event.preventDefault();
+document.getElementById("clearReturnedBtn").addEventListener("click", () => {
+  const confirmed = confirm("Clear all returned checkout records?");
 
-  const newComponent = {
-    name: document.getElementById("newName").value.trim(),
-    category: document.getElementById("newCategory").value.trim(),
-    type: document.getElementById("newType").value.trim(),
-    use: document.getElementById("newUse").value.trim(),
-    stock: Number(document.getElementById("newStock").value),
-    minimum: Number(document.getElementById("newMinimum").value),
-    location: document.getElementById("newLocation").value.trim()
-  };
+  if (!confirmed) {
+    return;
+  }
 
-  components.push(newComponent);
-  saveData();
-  event.target.reset();
+  checkouts = checkouts.filter(checkout => checkout.status !== "returned");
+  saveCheckouts();
   refreshEverything();
-  renderAdminList();
 });
 
 refreshEverything();
