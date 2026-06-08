@@ -34,12 +34,6 @@ const CATEGORY_LABELS = {
   testingEquipment: "Testing Equipment"
 };
 
-const CATEGORY_SHORT_LABELS = {
-  spareTools: "Spare",
-  safetyEquipment: "Safety",
-  testingEquipment: "Testing"
-};
-
 let checkouts = [];
 let tools = [];
 let isLoggedIn = false;
@@ -70,7 +64,6 @@ const selectedToolLabel = document.getElementById("selectedToolLabel");
 const selectedToolCategoryLabel = document.getElementById("selectedToolCategoryLabel");
 const toolList = document.getElementById("toolList");
 const toolSearchInput = document.getElementById("toolSearchInput");
-const toolCountBadge = document.getElementById("toolCountBadge");
 
 const verifyModal = document.getElementById("verifyModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
@@ -217,7 +210,7 @@ function renderToolPicker() {
   });
 
   const visibleTools = getVisibleTools();
-  toolCountBadge.innerText = `${visibleTools.length} ${visibleTools.length === 1 ? "tool" : "tools"}`;
+
   toolList.innerHTML = "";
 
   if (visibleTools.length === 0) {
@@ -229,19 +222,20 @@ function renderToolPicker() {
     `;
     return;
   }
-visibleTools.forEach(tool => {
-  const isSelected = selectedTool.value === tool.name;
 
-  toolList.innerHTML += `
-    <button type="button" class="tool-option ${isSelected ? "selected" : ""}" data-tool="${escapeHTML(tool.name)}" data-category="${escapeHTML(tool.category)}">
-      <span class="tool-option-copy">
-        <strong>${escapeHTML(tool.name)}</strong>
-        <small>${CATEGORY_LABELS[tool.category]}</small>
-      </span>
-      <span class="tool-option-check">${isSelected ? "Selected" : ""}</span>
-    </button>
-  `;
-});
+  visibleTools.forEach(tool => {
+    const isSelected = selectedTool.value === tool.name;
+
+    toolList.innerHTML += `
+      <button type="button" class="tool-option ${isSelected ? "selected" : ""}" data-tool="${escapeHTML(tool.name)}" data-category="${escapeHTML(tool.category)}">
+        <span class="tool-option-copy">
+          <strong>${escapeHTML(tool.name)}</strong>
+          <small>${CATEGORY_LABELS[tool.category]}</small>
+        </span>
+        <span class="tool-option-check">${isSelected ? "✓" : ""}</span>
+      </button>
+    `;
+  });
 
   document.querySelectorAll(".tool-option").forEach(button => {
     button.addEventListener("click", () => {
