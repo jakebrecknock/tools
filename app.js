@@ -1,9 +1,28 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  query,
+  orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+import { firebaseConfig } from "./firebase-config.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 const ADB_EMAIL_DOMAIN = "@adb-us.com";
 const ADMIN_PASSWORD = "ADB";
-const DEFAULT_LOAN_DAYS = 7;
 
-let checkouts = loadCheckouts();
+let checkouts = [];
 let isLoggedIn = false;
+let pendingAction = null;
 
 const dashboardView = document.getElementById("dashboardView");
 const recordsView = document.getElementById("recordsView");
@@ -20,22 +39,81 @@ const recordsTable = document.getElementById("recordsTable");
 const searchInput = document.getElementById("searchInput");
 const statusFilter = document.getElementById("statusFilter");
 
-function loadCheckouts() {
-  const saved = localStorage.getItem("adbToolCheckouts");
+const phoneNumber = document.getElementById("phoneNumber");
+const expectedReturnDate = document.getElementById("expectedReturnDate");
 
-  if (!saved) {
-    return [];
-  }
+const verifyModal = document.getElementById("verifyModal");
+const closeModalBtn = document.getElementById("closeModalBtn");
+const confirmVerifyBtn = document.getElementById("confirmVerifyBtn");
+const verifyEmailPrefix = document.getElementById("verifyEmailPrefix");
+const verifyPhoneNumber = document.getElementById("verifyPhoneNumber");
+const verifyError = document.getElementById("verifyError");
+const extendDateWrap = document.getElementById("extendDateWrap");
+const newReturnDate = document.getElementById("newReturnDate");
 
-  try {
-    return JSON.parse(saved);
-  } catch {
-    return [];
-  }
+function setDefaultReturnDate() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  expectedReturnDate.value = tomorrow.toISOString().split("T")[0];
 }
 
-function saveCheckouts() {
-  localStorage.setItem("adbToolCheckouts", JSON.stringify(checkouts));
+function formatPhone(value) {
+  const digits = value.replace(/\D/g, "").slice(0, 10);
+
+  if (digits.length < 4) {
+    return digits;
+  }
+
+  if (digits.length < 7) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  }
+
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+function phoneDigits(value) {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
+function cleanEmailPrefix(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(ADB_EMAIL_DOMAIN, "")
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
+function getFullEmail(prefix) {
+  return `${cleanEmailPrefix(prefix)}${ADB_EMAIL_DOMAIN}`;
+}
+
+function makeCheckoutDate() {
+  const date = new Date();
+  date.setHours(6, 0, 0, 0);
+  return date.toISOString();
+}
+
+function makeReturnDate(dateValue) {
+  const date = new Date(`${dateValue}T17:00:00`);
+  return date.toISOString();
+}
+
+function formatDate(dateString) {
+  return new Date(dateString).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function formatDateTime(dateString) {
+  return new Date(dateString).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function showView(viewName) {
@@ -63,49 +141,6 @@ function showView(viewName) {
     adminBtn.classList.add("active");
     renderAdminState();
   }
-}
-
-function getTodayAtSixAM() {
-  const date = new Date();
-  date.setHours(6, 0, 0, 0);
-  return date;
-}
-
-function getDefaultReturnDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + DEFAULT_LOAN_DAYS);
-  date.setHours(17, 0, 0, 0);
-  return date;
-}
-
-function formatDate(dateString) {
-  return new Date(dateString).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric"
-  });
-}
-
-function formatDateTime(dateString) {
-  return new Date(dateString).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-}
-
-function cleanEmailPrefix(value) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(ADB_EMAIL_DOMAIN, "")
-    .replace(/[^a-z0-9._-]/g, "");
-}
-
-function getFullEmail(prefix) {
-  return `${cleanEmailPrefix(prefix)}${ADB_EMAIL_DOMAIN}`;
 }
 
 function getActiveCheckouts() {
@@ -157,188 +192,143 @@ function renderActiveCards() {
           <h3>${escapeHTML(checkout.tool)}</h3>
           <p><strong>Checked out by:</strong> ${escapeHTML(checkout.name)}</p>
           <p><strong>Email:</strong> ${escapeHTML(checkout.email)}</p>
+          <p><strong>Phone:</strong> ${escapeHTML(checkout.phoneFormatted)}</p>
           <p><strong>Job site:</strong> ${escapeHTML(checkout.jobSite)}</p>
           <p><strong>Expected return:</strong> ${formatDate(checkout.expectedReturnAt)}</p>
 
-          <div class="status-row">
-            <span class="status-badge out">Checked Out</span>
-          </div>
+          <div class="tool-actions">
+            <button class="return-btn" data-action="return" data-id="${checkout.id}">
+              Mark Returned
+            </button>
 
-          <button class="return-btn" data-id="${checkout.id}">
-            Mark Returned
-          </button>
+            <button class="extend-btn" data-action="extend" data-id="${checkout.id}">
+              Extend Rental
+            </button>
+          </div>
         </div>
       </article>
     `;
   });
 
-  document.querySelectorAll(".return-btn").forEach(button => {
+  document.querySelectorAll("[data-action]").forEach(button => {
     button.addEventListener("click", () => {
-      markReturned(button.dataset.id);
+      openVerifyModal(button.dataset.id, button.dataset.action);
     });
   });
 }
 
 function renderRecordsTable() {
-  if (!recordsTable) {
-    return;
-  }
+  if (!recordsTable) return;
 
-  const query = searchInput.value.toLowerCase().trim();
+  const queryText = searchInput.value.toLowerCase().trim();
   const filter = statusFilter.value;
 
   const filtered = checkouts.filter(checkout => {
-    const searchableText = `
+    const searchable = `
       ${checkout.name}
       ${checkout.email}
+      ${checkout.phoneFormatted}
       ${checkout.tool}
       ${checkout.jobSite}
       ${checkout.status}
     `.toLowerCase();
 
-    const matchesSearch = searchableText.includes(query);
-    const matchesStatus = filter === "all" || checkout.status === filter;
-
-    return matchesSearch && matchesStatus;
+    return searchable.includes(queryText) && (filter === "all" || checkout.status === filter);
   });
 
   recordsTable.innerHTML = "";
 
   if (filtered.length === 0) {
-    recordsTable.innerHTML = `
+    recordsTable.innerHTML = `<tr><td colspan="8">No checkout records found.</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(checkout => {
+    recordsTable.innerHTML += `
       <tr>
-        <td colspan="7">No checkout records found.</td>
+        <td>${escapeHTML(checkout.tool)}</td>
+        <td>${escapeHTML(checkout.name)}</td>
+        <td>${escapeHTML(checkout.email)}</td>
+        <td>${escapeHTML(checkout.phoneFormatted)}</td>
+        <td>${escapeHTML(checkout.jobSite)}</td>
+        <td>${formatDateTime(checkout.checkedOutAt)}</td>
+        <td>${formatDateTime(checkout.expectedReturnAt)}</td>
+        <td>
+          <span class="status-badge ${checkout.status === "out" ? "out" : "good"}">
+            ${checkout.status === "out" ? "Checked Out" : "Returned"}
+          </span>
+        </td>
       </tr>
     `;
-    return;
-  }
-
-  filtered
-    .sort((a, b) => new Date(b.checkedOutAt) - new Date(a.checkedOutAt))
-    .forEach(checkout => {
-      recordsTable.innerHTML += `
-        <tr>
-          <td>${escapeHTML(checkout.tool)}</td>
-          <td>${escapeHTML(checkout.name)}</td>
-          <td>${escapeHTML(checkout.email)}</td>
-          <td>${escapeHTML(checkout.jobSite)}</td>
-          <td>${formatDateTime(checkout.checkedOutAt)}</td>
-          <td>${formatDateTime(checkout.expectedReturnAt)}</td>
-          <td>
-            <span class="status-badge ${checkout.status === "out" ? "out" : "good"}">
-              ${checkout.status === "out" ? "Checked Out" : "Returned"}
-            </span>
-          </td>
-        </tr>
-      `;
-    });
+  });
 }
 
-function markReturned(id) {
+function openVerifyModal(id, action) {
   const checkout = checkouts.find(item => item.id === id);
+  if (!checkout) return;
 
-  if (!checkout) {
+  pendingAction = { id, action };
+
+  document.getElementById("modalEyebrow").innerText = action === "extend" ? "Extend Rental" : "Return Tool";
+  document.getElementById("modalTitle").innerText = action === "extend" ? "Extend Tool Rental" : "Return Tool";
+
+  verifyEmailPrefix.value = "";
+  verifyPhoneNumber.value = "";
+  verifyError.classList.add("hidden");
+
+  extendDateWrap.classList.toggle("hidden", action !== "extend");
+
+  if (action === "extend") {
+    const currentReturn = new Date(checkout.expectedReturnAt);
+    currentReturn.setDate(currentReturn.getDate() + 1);
+    newReturnDate.value = currentReturn.toISOString().split("T")[0];
+  }
+
+  verifyModal.classList.remove("hidden");
+}
+
+function closeVerifyModal() {
+  verifyModal.classList.add("hidden");
+  pendingAction = null;
+}
+
+async function confirmVerifiedAction() {
+  if (!pendingAction) return;
+
+  const checkout = checkouts.find(item => item.id === pendingAction.id);
+  if (!checkout) return;
+
+  const typedEmail = getFullEmail(verifyEmailPrefix.value);
+  const typedPhone = phoneDigits(verifyPhoneNumber.value);
+
+  const emailMatches = typedEmail === checkout.email;
+  const phoneMatches = typedPhone === checkout.phoneDigits;
+
+  if (!emailMatches || !phoneMatches) {
+    verifyError.classList.remove("hidden");
     return;
   }
 
-  checkout.status = "returned";
-  checkout.returnedAt = new Date().toISOString();
-
-  saveCheckouts();
-  refreshEverything();
-}
-
-function createReminderQueue(checkout) {
-  const expectedReturn = new Date(checkout.expectedReturnAt);
-
-  const twentyFourHourReminder = new Date(expectedReturn);
-  twentyFourHourReminder.setDate(twentyFourHourReminder.getDate() - 1);
-  twentyFourHourReminder.setHours(17, 0, 0, 0);
-
-  const finalReminder = new Date(expectedReturn);
-  finalReminder.setHours(6, 0, 0, 0);
-
-  const escalation = new Date(expectedReturn);
-  escalation.setDate(escalation.getDate() + 1);
-  escalation.setHours(6, 0, 0, 0);
-
-  return [
-    {
-      type: "24 Hour Reminder",
-      sendAt: twentyFourHourReminder.toISOString(),
-      to: checkout.email,
-      cc: "",
-      subject: `REMINDER: 24 hours to return ${checkout.tool}`,
-      body: `REMINDER: 24 hours to return "${checkout.tool}" or check out for longer.`
-    },
-    {
-      type: "Final Reminder",
-      sendAt: finalReminder.toISOString(),
-      to: checkout.email,
-      cc: "",
-      subject: `FINAL REMINDER: ${checkout.tool} is due today`,
-      body: `FINAL REMINDER: "${checkout.tool}" is due back today by 5:00 PM.`
-    },
-    {
-      type: "Escalation",
-      sendAt: escalation.toISOString(),
-      to: checkout.email,
-      cc: `ajkwasek${ADB_EMAIL_DOMAIN}, nharbacek${ADB_EMAIL_DOMAIN}`,
-      subject: `OVERDUE TOOL: ${checkout.tool}`,
-      body: `"${checkout.tool}" was not returned by the expected deadline. Please return it immediately or update the checkout.`
-    }
-  ];
-}
-
-function getQueuedEmails() {
-  return getActiveCheckouts().flatMap(checkout => {
-    return createReminderQueue(checkout).map(email => ({
-      ...email,
-      checkoutId: checkout.id,
-      tool: checkout.tool,
-      worker: checkout.name
-    }));
-  });
-}
-
-function renderEmailQueue() {
-  const emailQueue = document.getElementById("emailQueue");
-
-  if (!emailQueue || !isLoggedIn) {
-    return;
+  if (pendingAction.action === "return") {
+    await updateDoc(doc(db, "checkouts", checkout.id), {
+      status: "returned",
+      returnedAt: new Date().toISOString()
+    });
   }
 
-  const queuedEmails = getQueuedEmails();
+  if (pendingAction.action === "extend") {
+    if (!newReturnDate.value) return;
 
-  emailQueue.innerHTML = "";
-
-  if (queuedEmails.length === 0) {
-    emailQueue.innerHTML = `
-      <div class="admin-item">
-        <div class="admin-item-header">
-          <strong>No reminder emails queued</strong>
-        </div>
-        <p class="muted">Emails will queue here after tools are checked out.</p>
-      </div>
-    `;
-    return;
+    await updateDoc(doc(db, "checkouts", checkout.id), {
+      expectedReturnAt: makeReturnDate(newReturnDate.value),
+      reminder24Sent: false,
+      reminderReturnDaySent: false,
+      lateNoticeSent: false,
+      extendedAt: new Date().toISOString()
+    });
   }
 
-  queuedEmails.forEach(email => {
-    emailQueue.innerHTML += `
-      <div class="admin-item">
-        <div class="admin-item-header">
-          <strong>${escapeHTML(email.type)}</strong>
-          <span class="status-badge out">${formatDateTime(email.sendAt)}</span>
-        </div>
-        <p class="muted"><strong>Tool:</strong> ${escapeHTML(email.tool)}</p>
-        <p class="muted"><strong>Worker:</strong> ${escapeHTML(email.worker)}</p>
-        <p class="muted"><strong>To:</strong> ${escapeHTML(email.to)}</p>
-        ${email.cc ? `<p class="muted"><strong>CC:</strong> ${escapeHTML(email.cc)}</p>` : ""}
-        <p class="muted"><strong>Subject:</strong> ${escapeHTML(email.subject)}</p>
-      </div>
-    `;
-  });
+  closeVerifyModal();
 }
 
 function renderAdminState() {
@@ -350,43 +340,92 @@ function renderAdminState() {
   }
 }
 
+function renderEmailQueue() {
+  const emailQueue = document.getElementById("emailQueue");
+  if (!emailQueue || !isLoggedIn) return;
+
+  const active = getActiveCheckouts();
+
+  emailQueue.innerHTML = "";
+
+  if (active.length === 0) {
+    emailQueue.innerHTML = `
+      <div class="admin-item">
+        <div class="admin-item-header">
+          <strong>No active email reminders</strong>
+        </div>
+        <p class="muted">Reminder emails will appear once tools are checked out.</p>
+      </div>
+    `;
+    return;
+  }
+
+  active.forEach(checkout => {
+    emailQueue.innerHTML += `
+      <div class="admin-item">
+        <div class="admin-item-header">
+          <strong>${escapeHTML(checkout.tool)}</strong>
+          <span class="status-badge out">Active</span>
+        </div>
+        <p class="muted"><strong>To:</strong> ${escapeHTML(checkout.email)}</p>
+        <p class="muted"><strong>24h reminder:</strong> ${checkout.reminder24Sent ? "Sent" : "Pending"}</p>
+        <p class="muted"><strong>Return-day reminder:</strong> ${checkout.reminderReturnDaySent ? "Sent" : "Pending"}</p>
+        <p class="muted"><strong>Late notice:</strong> ${checkout.lateNoticeSent ? "Sent" : "Pending"}</p>
+      </div>
+    `;
+  });
+}
+
 function escapeHTML(value) {
-  return String(value)
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll('"', "&quot;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 }
 
-checkoutForm.addEventListener("submit", event => {
+phoneNumber.addEventListener("input", () => {
+  phoneNumber.value = formatPhone(phoneNumber.value);
+});
+
+verifyPhoneNumber.addEventListener("input", () => {
+  verifyPhoneNumber.value = formatPhone(verifyPhoneNumber.value);
+});
+
+checkoutForm.addEventListener("submit", async event => {
   event.preventDefault();
 
   const name = document.getElementById("workerName").value.trim();
   const emailPrefix = document.getElementById("emailPrefix").value.trim();
+  const phoneFormatted = formatPhone(phoneNumber.value);
+  const digits = phoneDigits(phoneNumber.value);
   const tool = document.getElementById("toolName").value.trim();
   const jobSite = document.getElementById("jobSite").value.trim();
 
-  if (!name || !emailPrefix || !tool || !jobSite) {
+  if (!name || !emailPrefix || digits.length !== 10 || !tool || !jobSite || !expectedReturnDate.value) {
+    alert("Please complete every field. Phone number must be 10 digits.");
     return;
   }
 
-  const checkout = {
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+  await addDoc(collection(db, "checkouts"), {
     name,
     email: getFullEmail(emailPrefix),
+    phoneFormatted,
+    phoneDigits: digits,
     tool,
     jobSite,
-    checkedOutAt: getTodayAtSixAM().toISOString(),
-    expectedReturnAt: getDefaultReturnDate().toISOString(),
+    checkedOutAt: makeCheckoutDate(),
+    expectedReturnAt: makeReturnDate(expectedReturnDate.value),
     status: "out",
-    returnedAt: null
-  };
-
-  checkouts.push(checkout);
-  saveCheckouts();
+    returnedAt: null,
+    reminder24Sent: false,
+    reminderReturnDaySent: false,
+    lateNoticeSent: false,
+    createdAt: serverTimestamp()
+  });
 
   checkoutForm.reset();
-  refreshEverything();
+  setDefaultReturnDate();
 });
 
 dashboardBtn.addEventListener("click", () => showView("dashboard"));
@@ -396,6 +435,9 @@ adminBtn.addEventListener("click", () => showView("admin"));
 
 searchInput.addEventListener("input", renderRecordsTable);
 statusFilter.addEventListener("change", renderRecordsTable);
+
+closeModalBtn.addEventListener("click", closeVerifyModal);
+confirmVerifyBtn.addEventListener("click", confirmVerifiedAction);
 
 document.getElementById("loginBtn").addEventListener("click", () => {
   const password = document.getElementById("passwordInput").value;
@@ -421,17 +463,25 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   renderAdminState();
 });
 
-document.getElementById("clearReturnedBtn").addEventListener("click", () => {
+document.getElementById("clearReturnedBtn").addEventListener("click", async () => {
   const confirmed = confirm("Clear all returned checkout records?");
+  if (!confirmed) return;
 
-  if (!confirmed) {
-    return;
+  const returned = checkouts.filter(checkout => checkout.status === "returned");
+
+  for (const checkout of returned) {
+    await deleteDoc(doc(db, "checkouts", checkout.id));
   }
+});
 
-  checkouts = checkouts.filter(checkout => checkout.status !== "returned");
-  saveCheckouts();
+onSnapshot(query(collection(db, "checkouts"), orderBy("createdAt", "desc")), snapshot => {
+  checkouts = snapshot.docs.map(item => ({
+    id: item.id,
+    ...item.data()
+  }));
+
   refreshEverything();
 });
 
-refreshEverything();
+setDefaultReturnDate();
 showView("dashboard");
