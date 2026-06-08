@@ -46,7 +46,7 @@
         <p class="eyebrow">Checkout</p>
         <h2>Check Out a Tool</h2>
       </div>
-      <p class="muted">Hover over a tool category, then pick the tool you need.</p>
+      <p class="muted">Pick a category, then select the tool you need.</p>
     </div>
 
     <div class="checkout-card">
@@ -62,30 +62,22 @@
 
         <div class="tool-picker-field">
           <label>Tool checkout</label>
-
           <input id="selectedTool" type="hidden" required />
 
           <div class="tool-picker" id="toolPicker">
             <button type="button" class="tool-picker-main" id="toolPickerMain">
               <span id="selectedToolLabel">Select a tool</span>
-              <span>▾</span>
+              <span class="tool-picker-arrow">▾</span>
             </button>
 
             <div class="tool-menu" id="toolMenu">
-              <div class="tool-category">
-                <button type="button" class="tool-category-btn">Spare Tools</button>
-                <div class="tool-submenu" id="spareToolsMenu"></div>
+              <div class="tool-category-tabs">
+                <button type="button" class="tool-tab active" data-category="spareTools">Spare Tools</button>
+                <button type="button" class="tool-tab" data-category="safetyEquipment">Safety Equipment</button>
+                <button type="button" class="tool-tab" data-category="testingEquipment">Testing Equipment</button>
               </div>
 
-              <div class="tool-category">
-                <button type="button" class="tool-category-btn">Safety Equipment</button>
-                <div class="tool-submenu" id="safetyEquipmentMenu"></div>
-              </div>
-
-              <div class="tool-category">
-                <button type="button" class="tool-category-btn">Testing Equipment</button>
-                <div class="tool-submenu" id="testingEquipmentMenu"></div>
-              </div>
+              <div id="toolList" class="tool-list"></div>
             </div>
           </div>
         </div>
