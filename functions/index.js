@@ -50,7 +50,6 @@ exports.sendCheckoutConfirmation = onDocumentCreated(
 Tool: ${checkout.tool}
 Name: ${checkout.name}
 Phone: ${checkout.phoneFormatted}
-Job Site: ${checkout.jobSite}
 Expected Return: ${formatDate(new Date(checkout.expectedReturnAt))} by 5:00 PM
 
 Please return the tool on time or extend the rental before the return date.`
@@ -102,7 +101,6 @@ exports.sendScheduledToolReminders = onSchedule(
 `REMINDER: You have about 24 hours to return "${checkout.tool}" or extend the checkout.
 
 Tool: ${checkout.tool}
-Job Site: ${checkout.jobSite}
 Expected Return: ${formatDate(expected)} by 5:00 PM`
         });
 
@@ -134,7 +132,6 @@ Tool: ${checkout.tool}
 Checked Out By: ${checkout.name}
 Worker Email: ${checkout.email}
 Phone: ${checkout.phoneFormatted}
-Job Site: ${checkout.jobSite}
 Expected Return: ${formatDate(expected)} by 5:00 PM
 
 Please return this tool immediately or update the checkout.`
