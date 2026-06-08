@@ -110,6 +110,7 @@ select {
 .nav-btn.active {
   background: var(--orange);
   border-color: var(--orange);
+  color: white;
   transform: translateY(-1px);
 }
 
@@ -309,16 +310,17 @@ main {
   justify-content: space-between;
   cursor: pointer;
   color: var(--text);
-  height: 62px;
+  height: 52px;
   padding: 0 16px;
   background: #ffffff;
-  border: 1px solid var(--border);
+  border: 1px solid var(--dark);
+  border-radius: 8px;
   transition: 0.18s ease;
 }
 
 .tool-picker-main:hover {
-  border-color: #d1d5db;
-  background: #fbfbfc;
+  border-color: var(--dark);
+  background: #ffffff;
 }
 
 .tool-picker-left {
@@ -337,14 +339,11 @@ main {
 }
 
 .tool-picker-left small {
-  display: block;
-  color: var(--muted);
-  font-weight: 700;
-  margin-top: 3px;
+  display: none;
 }
 
 .tool-picker-arrow {
-  color: #9ca3af;
+  color: #111827;
   font-weight: 900;
   transition: 0.18s ease;
   flex: 0 0 auto;
@@ -356,13 +355,13 @@ main {
 
 .tool-menu {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 8px);
   left: 0;
   width: min(560px, calc(100vw - 48px));
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.16);
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 22px 55px rgba(17, 24, 39, 0.18);
   padding: 0;
   overflow: hidden;
   opacity: 0;
@@ -396,7 +395,7 @@ main {
 }
 
 .tool-search-wrap span {
-  color: #9ca3af;
+  color: #6b7280;
   font-weight: 900;
 }
 
@@ -428,11 +427,11 @@ main {
 .tool-tab {
   border: none;
   border-right: 1px solid #e5e7eb;
-  background: transparent;
+  background: #f8fafc;
   color: #111827;
   min-height: 44px;
   border-radius: 0;
-  padding: 0 10px;
+  padding: 0 8px;
   font-size: 12px;
   font-weight: 900;
   cursor: pointer;
@@ -441,7 +440,7 @@ main {
   overflow: hidden;
   text-overflow: ellipsis;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.35px;
 }
 
 .tool-tab:last-child {
@@ -455,7 +454,7 @@ main {
 
 .tool-tab.active {
   background: var(--dark);
-  color: white;
+  color: #ffffff;
 }
 
 .tool-list {
@@ -516,7 +515,7 @@ main {
 }
 
 .tool-option-copy small {
-  color: var(--muted);
+  color: #4b5563;
   font-weight: 700;
   display: block;
   margin-top: 3px;
@@ -543,7 +542,7 @@ main {
 }
 
 .tool-option.selected {
-  background: #f3f4f6;
+  background: #eef2f7;
 }
 
 .tool-option.selected .tool-option-copy strong {
@@ -551,7 +550,7 @@ main {
 }
 
 .tool-option.selected .tool-option-copy small {
-  color: #4b5563;
+  color: #374151;
 }
 
 .empty-tool-message {
@@ -570,7 +569,7 @@ main {
 
 /* END TOOL SELECTOR */
 
-.checkout-form button {
+.checkout-form > button[type="submit"] {
   grid-column: 1 / -1;
   border: none;
   background: var(--orange);
@@ -583,7 +582,7 @@ main {
   font-size: 16px;
 }
 
-.checkout-form button:hover {
+.checkout-form > button[type="submit"]:hover {
   background: var(--orange-dark);
   transform: translateY(-1px);
 }
