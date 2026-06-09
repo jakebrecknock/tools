@@ -19,6 +19,7 @@
   <nav class="nav-actions">
     <button id="dashboardBtn" class="nav-btn active">Dashboard</button>
     <button id="recordsBtn" class="nav-btn">Records</button>
+    <button id="requestBtn" class="nav-btn">Requests</button>
     <button id="adminBtn" class="nav-btn">Admin</button>
   </nav>
 </header>
@@ -50,6 +51,11 @@
     </div>
 
     <div class="checkout-card">
+      <div class="checkout-mode-tabs">
+        <button type="button" class="checkout-mode-tab active" id="checkoutNowTab">Check Out Now</button>
+        <button type="button" class="checkout-mode-tab" id="checkoutLaterTab">Check Out for Later</button>
+      </div>
+
       <form id="checkoutForm" class="checkout-form">
         <input id="workerName" placeholder="Your name" required />
 
@@ -93,12 +99,27 @@
           </div>
         </div>
 
+        <div class="date-field hidden" id="scheduledStartWrap">
+          <label for="scheduledStartDate">Checkout start date</label>
+          <input id="scheduledStartDate" type="date" />
+        </div>
+
         <div class="date-field">
           <label for="expectedReturnDate">Expected return date</label>
           <input id="expectedReturnDate" type="date" required />
         </div>
 
-        <button type="submit">Check Out Tool</button>
+        <label class="checkbox-row full-span">
+          <input id="damageAtCheckout" type="checkbox" />
+          <span>Report damage or missing items at checkout</span>
+        </label>
+
+        <div id="checkoutDamageWrap" class="damage-comment-wrap full-span hidden">
+          <label for="checkoutDamageComment">Describe damage/missing items</label>
+          <textarea id="checkoutDamageComment" placeholder="Example: missing charging cable, broken bolt, cracked case..."></textarea>
+        </div>
+
+        <button id="checkoutSubmitBtn" type="submit">Check Out Tool</button>
       </form>
     </div>
 
@@ -107,10 +128,20 @@
         <p class="eyebrow">Currently Out</p>
         <h2>Active Checkouts</h2>
       </div>
-      <p class="muted">Only the person who checked out a tool can return or extend it.</p>
+      <p class="muted">ONLY FOREMEN OR T-3+ CAN CHECK OUT TOOLS. YOU ARE RESPONSIBLE FOR ALL TOOLS CHECKED OUT IN YOUR NAME.</p>
     </div>
 
     <div id="activeGrid" class="component-grid"></div>
+
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Dibs</p>
+        <h2>Scheduled Checkouts</h2>
+      </div>
+      <p class="muted">Scheduled tools stay available until the scheduled checkout date begins.</p>
+    </div>
+
+    <div id="scheduledGrid" class="component-grid"></div>
   </section>
 
   <section id="recordsView" class="view hidden">
@@ -122,14 +153,30 @@
       <p class="muted">Live records from Firebase.</p>
     </div>
 
-    <div class="inventory-controls">
+    <div class="inventory-controls records-controls">
       <input type="text" id="searchInput" placeholder="Search name, email, phone, tool..." />
 
       <select id="statusFilter">
         <option value="all">All Records</option>
         <option value="out">Checked Out</option>
+        <option value="scheduled">Scheduled</option>
         <option value="returned">Returned</option>
+        <option value="cancelled">Cancelled</option>
       </select>
+
+      <div class="date-field compact-date">
+        <label for="recordStartDate">From</label>
+        <input id="recordStartDate" type="date" />
+      </div>
+
+      <div class="date-field compact-date">
+        <label for="recordEndDate">To</label>
+        <input id="recordEndDate" type="date" />
+      </div>
+
+      <button id="clearDateFiltersBtn" class="back-btn" type="button">Clear Dates</button>
+      <button id="exportHtmlBtn" class="back-btn" type="button">Export HTML</button>
+      <button id="exportPdfBtn" class="extend-btn" type="button">Export PDF</button>
     </div>
 
     <div class="table-wrap">
@@ -147,6 +194,42 @@
         </thead>
         <tbody id="recordsTable"></tbody>
       </table>
+    </div>
+  </section>
+
+  <section id="requestView" class="view hidden">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Requests</p>
+        <h2>General Request / Comment</h2>
+      </div>
+      <p class="muted">Request a new tool or send a general comment to Nick and AJ.</p>
+    </div>
+
+    <div class="checkout-card">
+      <form id="requestForm" class="checkout-form">
+        <input id="requestName" placeholder="Your name" required />
+
+        <div class="email-row">
+          <input id="requestEmailPrefix" placeholder="email name" required />
+          <span>@adb-us.com</span>
+        </div>
+
+        <input id="requestPhoneNumber" placeholder="Phone number" maxlength="14" required />
+
+        <select id="requestType" required>
+          <option value="New Tool Request">New Tool Request</option>
+          <option value="General Comment">General Comment</option>
+          <option value="Inventory Issue">Inventory Issue</option>
+        </select>
+
+        <div class="damage-comment-wrap full-span">
+          <label for="requestComment">Request / Comment</label>
+          <textarea id="requestComment" placeholder="Write your request or comment here..." required></textarea>
+        </div>
+
+        <button type="submit">Submit Request</button>
+      </form>
     </div>
   </section>
 
@@ -230,6 +313,16 @@
       <div id="extendDateWrap" class="date-field hidden">
         <label for="newReturnDate">New expected return date</label>
         <input id="newReturnDate" type="date" />
+      </div>
+
+      <label id="returnDamageRow" class="checkbox-row hidden">
+        <input id="damageAtReturn" type="checkbox" />
+        <span>Report damage or missing items at return</span>
+      </label>
+
+      <div id="returnDamageWrap" class="damage-comment-wrap hidden">
+        <label for="returnDamageComment">Describe damage/missing items</label>
+        <textarea id="returnDamageComment" placeholder="Example: missing charging cable, broken bolt, cracked case..."></textarea>
       </div>
 
       <p id="verifyError" class="error-text hidden">That email or phone number does not match this checkout.</p>

@@ -12,6 +12,8 @@
   --danger-bg: #fee2e2;
   --success: #15803d;
   --success-bg: #dcfce7;
+  --warning: #92400e;
+  --warning-bg: #fef3c7;
   --shadow: 0 14px 35px rgba(17, 24, 39, 0.08);
 }
 
@@ -31,7 +33,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font-family: inherit;
 }
 
@@ -216,6 +219,34 @@ main {
   overflow: visible;
 }
 
+.checkout-mode-tabs {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  background: #f3f4f6;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  margin-bottom: 18px;
+}
+
+.checkout-mode-tab {
+  border: none;
+  border-radius: 999px;
+  padding: 11px 18px;
+  font-weight: 900;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.checkout-mode-tab:hover,
+.checkout-mode-tab.active {
+  background: var(--orange);
+  color: white;
+  transform: translateY(-1px);
+}
+
 .checkout-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
@@ -224,6 +255,7 @@ main {
 }
 
 .checkout-form input,
+.checkout-form select,
 .email-row input,
 .date-field input,
 .tool-picker-main,
@@ -241,17 +273,24 @@ main {
 }
 
 .checkout-form input:focus,
+.checkout-form select:focus,
 .email-row input:focus,
 .date-field input:focus,
 .inventory-controls input:focus,
 .inventory-controls select:focus,
 .login-row input:focus,
 .modal-form input:focus,
+.modal-form textarea:focus,
 .admin-tool-form input:focus,
 .admin-tool-form select:focus,
-.tool-picker-main:focus {
+.tool-picker-main:focus,
+.damage-comment-wrap textarea:focus {
   border-color: rgba(255, 107, 0, 0.45);
   box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.08);
+}
+
+.full-span {
+  grid-column: 1 / -1;
 }
 
 .email-row {
@@ -291,10 +330,55 @@ main {
 }
 
 .date-field label,
-.tool-picker-field label {
+.tool-picker-field label,
+.damage-comment-wrap label {
   color: var(--muted);
   font-size: 13px;
   font-weight: 900;
+}
+
+.compact-date {
+  min-width: 150px;
+}
+
+.checkbox-row {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0 14px;
+  color: var(--text);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--orange);
+}
+
+.damage-comment-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.damage-comment-wrap textarea,
+.modal-form textarea {
+  width: 100%;
+  min-height: 105px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  outline: none;
 }
 
 /* TOOL SELECTOR */
@@ -553,6 +637,18 @@ main {
   color: #374151;
 }
 
+.tool-option.unavailable {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.tool-option.unavailable .tool-option-copy strong,
+.tool-option.unavailable .tool-option-copy small {
+  color: #9ca3af;
+}
+
 .empty-tool-message {
   padding: 22px;
   background: #ffffff;
@@ -605,6 +701,10 @@ main {
 .component-card:hover {
   transform: translateY(-5px);
   box-shadow: var(--shadow);
+}
+
+.scheduled-card {
+  border-color: rgba(255, 107, 0, 0.3);
 }
 
 .placeholder-image {
@@ -682,6 +782,16 @@ main {
   background: var(--danger-bg);
 }
 
+.status-badge.scheduled {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.status-badge.cancelled {
+  color: #4b5563;
+  background: #e5e7eb;
+}
+
 .return-btn,
 .back-btn,
 .extend-btn {
@@ -725,10 +835,20 @@ main {
   margin-top: 14px;
 }
 
+.single-action {
+  grid-template-columns: 1fr;
+}
+
 .inventory-controls {
   display: flex;
   gap: 14px;
   margin-bottom: 18px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.records-controls {
+  align-items: end;
 }
 
 .inventory-controls input,
@@ -745,6 +865,7 @@ main {
 
 .inventory-controls input {
   flex: 1;
+  min-width: 220px;
 }
 
 .table-wrap {
@@ -1097,6 +1218,17 @@ tbody tr:hover {
     align-items: stretch;
   }
 
+  .checkout-mode-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    border-radius: 18px;
+  }
+
+  .checkout-mode-tab {
+    border-radius: 14px;
+  }
+
   .checkout-form,
   .admin-tool-form {
     grid-template-columns: 1fr;
@@ -1154,6 +1286,13 @@ tbody tr:hover {
   }
 
   .login-row input {
+    min-width: 0;
+  }
+
+  .inventory-controls input,
+  .inventory-controls select,
+  .compact-date {
+    width: 100%;
     min-width: 0;
   }
 }

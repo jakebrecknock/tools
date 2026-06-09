@@ -10,7 +10,8 @@ const SENDGRID_API_KEY = defineSecret("SENDGRID_API_KEY");
 
 const FROM_EMAIL = "jbrecknock@adb-us.com";
 const AJ_EMAIL = "ajkwasek@adb-us.com";
-const NICK_EMAIL = "nharbacek@adb-us.com";
+const NICK_EMAIL = "nhharbacek@adb-us.com";
+const MANAGER_EMAILS = [AJ_EMAIL, NICK_EMAIL];
 
 function formatDate(date) {
   return date.toLocaleDateString("en-US", {
@@ -21,14 +22,42 @@ function formatDate(date) {
   });
 }
 
+function formatDateTime(date) {
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Chicago"
+  });
+}
+
 async function sendEmail({ to, cc, subject, text }) {
-  await sgMail.send({
+  const message = {
     to,
-    cc,
     from: FROM_EMAIL,
     subject,
     text
-  });
+  };
+
+  if (cc) {
+    message.cc = cc;
+  }
+
+  await sgMail.send(message);
+}
+
+function checkoutDetails(checkout) {
+  const checkoutStart = checkout.checkoutStartAt || checkout.checkedOutAt;
+  const expectedReturn = checkout.expectedReturnAt;
+
+  return `Tool: ${checkout.tool}
+Name: ${checkout.name}
+Worker Email: ${checkout.email}
+Phone: ${checkout.phoneFormatted || checkout.phone || ""}
+Checkout Start: ${checkoutStart ? formatDateTime(new Date(checkoutStart)) : "Not listed"}
+Expected Return: ${expectedReturn ? `${formatDate(new Date(expectedReturn))} by 5:00 PM` : "Not listed"}`;
 }
 
 exports.sendCheckoutConfirmation = onDocumentCreated(
@@ -40,6 +69,37 @@ exports.sendCheckoutConfirmation = onDocumentCreated(
     sgMail.setApiKey(SENDGRID_API_KEY.value());
 
     const checkout = event.data.data();
+
+    if (checkout.status === "scheduled") {
+      await sendEmail({
+        to: checkout.email,
+        subject: `Tool Reservation Scheduled: ${checkout.tool}`,
+        text:
+`This confirms your scheduled ADB tool checkout.
+
+${checkoutDetails(checkout)}
+
+You do not need to do anything else to confirm this reservation. Doing nothing keeps the checkout scheduled.
+
+If you need to cancel it, open the Tool Checkout dashboard and cancel the scheduled checkout before it begins.`
+      });
+
+      if (checkout.damageAtCheckout && checkout.damageComment) {
+        await sendEmail({
+          to: MANAGER_EMAILS,
+          subject: `Damage/Missing Item Reported on Scheduled Checkout: ${checkout.tool}`,
+          text:
+`Damage or missing items were reported while scheduling a checkout.
+
+${checkoutDetails(checkout)}
+
+Report:
+${checkout.damageComment}`
+        });
+      }
+
+      return;
+    }
 
     await sendEmail({
       to: checkout.email,
@@ -53,6 +113,75 @@ Phone: ${checkout.phoneFormatted}
 Expected Return: ${formatDate(new Date(checkout.expectedReturnAt))} by 5:00 PM
 
 Please return the tool on time or extend the rental before the return date.`
+    });
+
+    if (checkout.damageAtCheckout && checkout.damageComment) {
+      await sendEmail({
+        to: MANAGER_EMAILS,
+        subject: `Damage/Missing Item Reported at Checkout: ${checkout.tool}`,
+        text:
+`Damage or missing items were reported during checkout.
+
+${checkoutDetails(checkout)}
+
+Report:
+${checkout.damageComment}`
+      });
+    }
+  }
+);
+
+exports.sendDamageReport = onDocumentCreated(
+  {
+    document: "damageReports/{reportId}",
+    secrets: [SENDGRID_API_KEY]
+  },
+  async event => {
+    sgMail.setApiKey(SENDGRID_API_KEY.value());
+
+    const report = event.data.data();
+
+    await sendEmail({
+      to: MANAGER_EMAILS,
+      subject: `Damage/Missing Item Report: ${report.tool || "Tool"}`,
+      text:
+`A damage or missing item report was submitted.
+
+Tool: ${report.tool || ""}
+Report Type: ${report.reportType || ""}
+Name: ${report.name || ""}
+Email: ${report.email || ""}
+Phone: ${report.phoneFormatted || report.phone || ""}
+
+Comment:
+${report.comment || ""}`
+    });
+  }
+);
+
+exports.sendGeneralRequest = onDocumentCreated(
+  {
+    document: "requests/{requestId}",
+    secrets: [SENDGRID_API_KEY]
+  },
+  async event => {
+    sgMail.setApiKey(SENDGRID_API_KEY.value());
+
+    const request = event.data.data();
+
+    await sendEmail({
+      to: MANAGER_EMAILS,
+      subject: `Tool Checkout Request/Comment: ${request.type || "General Comment"}`,
+      text:
+`A new request/comment was submitted from the Tool Checkout System.
+
+Type: ${request.type || ""}
+Name: ${request.name || ""}
+Email: ${request.email || ""}
+Phone: ${request.phoneFormatted || request.phone || ""}
+
+Comment:
+${request.comment || ""}`
     });
   }
 );
@@ -68,15 +197,75 @@ exports.sendScheduledToolReminders = onSchedule(
 
     const now = new Date();
 
-    const snapshot = await admin
+    const activeSnapshot = await admin
       .firestore()
       .collection("checkouts")
       .where("status", "==", "out")
       .get();
 
+    const scheduledSnapshot = await admin
+      .firestore()
+      .collection("checkouts")
+      .where("status", "==", "scheduled")
+      .get();
+
     const updates = [];
 
-    for (const docSnap of snapshot.docs) {
+    for (const docSnap of scheduledSnapshot.docs) {
+      const checkout = docSnap.data();
+      const ref = docSnap.ref;
+
+      const start = new Date(checkout.checkoutStartAt || checkout.checkedOutAt);
+      const expected = new Date(checkout.expectedReturnAt);
+
+      const scheduledReminder = new Date(start);
+      scheduledReminder.setDate(scheduledReminder.getDate() - 1);
+      scheduledReminder.setHours(9, 0, 0, 0);
+
+      const startDay = new Date(start);
+      startDay.setHours(6, 0, 0, 0);
+
+      if (!checkout.scheduledReminderSent && now >= scheduledReminder) {
+        await sendEmail({
+          to: checkout.email,
+          subject: `REMINDER: You have ${checkout.tool} scheduled tomorrow`,
+          text:
+`REMINDER: You have a scheduled ADB tool checkout coming up.
+
+${checkoutDetails(checkout)}
+
+You do not need to do anything to confirm. Doing nothing keeps the checkout scheduled.
+
+If you need to cancel, open the Tool Checkout dashboard and cancel the scheduled checkout before it begins.`
+        });
+
+        updates.push(ref.update({ scheduledReminderSent: true }));
+      }
+
+      if (!checkout.startDayEmailSent && now >= startDay) {
+        await sendEmail({
+          to: checkout.email,
+          subject: `Tool Checkout Starts Today: ${checkout.tool}`,
+          text:
+`Your scheduled ADB tool checkout starts today.
+
+${checkoutDetails(checkout)}
+
+You are responsible for this tool while it is checked out in your name.`
+        });
+
+        updates.push(
+          ref.update({
+            status: "out",
+            checkedOutAt: start.toISOString(),
+            startDayEmailSent: true,
+            activatedAt: admin.firestore.FieldValue.serverTimestamp()
+          })
+        );
+      }
+    }
+
+    for (const docSnap of activeSnapshot.docs) {
       const checkout = docSnap.data();
       const ref = docSnap.ref;
 
@@ -123,7 +312,7 @@ Please return the tool or extend the checkout.`
       if (!checkout.lateNoticeSent && now >= lateNotice) {
         await sendEmail({
           to: checkout.email,
-          cc: [AJ_EMAIL, NICK_EMAIL],
+          cc: MANAGER_EMAILS,
           subject: `LATE NOTICE: ${checkout.tool} was not returned`,
           text:
 `LATE NOTICE: "${checkout.tool}" was not returned by the expected deadline.

@@ -40,24 +40,40 @@ let isLoggedIn = false;
 let pendingAction = null;
 let activeToolCategory = "all";
 let toolSearchQuery = "";
+let checkoutMode = "now";
 
 const dashboardView = document.getElementById("dashboardView");
 const recordsView = document.getElementById("recordsView");
+const requestView = document.getElementById("requestView");
 const adminView = document.getElementById("adminView");
 
 const dashboardBtn = document.getElementById("dashboardBtn");
 const recordsBtn = document.getElementById("recordsBtn");
+const requestBtn = document.getElementById("requestBtn");
 const adminBtn = document.getElementById("adminBtn");
 const logoHomeBtn = document.getElementById("logoHomeBtn");
 
 const checkoutForm = document.getElementById("checkoutForm");
 const activeGrid = document.getElementById("activeGrid");
+const scheduledGrid = document.getElementById("scheduledGrid");
 const recordsTable = document.getElementById("recordsTable");
 const searchInput = document.getElementById("searchInput");
 const statusFilter = document.getElementById("statusFilter");
+const recordStartDate = document.getElementById("recordStartDate");
+const recordEndDate = document.getElementById("recordEndDate");
 
 const phoneNumber = document.getElementById("phoneNumber");
 const expectedReturnDate = document.getElementById("expectedReturnDate");
+const scheduledStartDate = document.getElementById("scheduledStartDate");
+const scheduledStartWrap = document.getElementById("scheduledStartWrap");
+
+const checkoutNowTab = document.getElementById("checkoutNowTab");
+const checkoutLaterTab = document.getElementById("checkoutLaterTab");
+const checkoutSubmitBtn = document.getElementById("checkoutSubmitBtn");
+
+const damageAtCheckout = document.getElementById("damageAtCheckout");
+const checkoutDamageWrap = document.getElementById("checkoutDamageWrap");
+const checkoutDamageComment = document.getElementById("checkoutDamageComment");
 
 const selectedTool = document.getElementById("selectedTool");
 const selectedToolLabel = document.getElementById("selectedToolLabel");
@@ -74,6 +90,18 @@ const verifyError = document.getElementById("verifyError");
 const extendDateWrap = document.getElementById("extendDateWrap");
 const newReturnDate = document.getElementById("newReturnDate");
 
+const returnDamageRow = document.getElementById("returnDamageRow");
+const damageAtReturn = document.getElementById("damageAtReturn");
+const returnDamageWrap = document.getElementById("returnDamageWrap");
+const returnDamageComment = document.getElementById("returnDamageComment");
+
+const requestForm = document.getElementById("requestForm");
+const requestName = document.getElementById("requestName");
+const requestEmailPrefix = document.getElementById("requestEmailPrefix");
+const requestPhoneNumber = document.getElementById("requestPhoneNumber");
+const requestType = document.getElementById("requestType");
+const requestComment = document.getElementById("requestComment");
+
 const addToolForm = document.getElementById("addToolForm");
 const newToolName = document.getElementById("newToolName");
 const newToolCategory = document.getElementById("newToolCategory");
@@ -83,6 +111,12 @@ function setDefaultReturnDate() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   expectedReturnDate.value = tomorrow.toISOString().split("T")[0];
+
+  if (scheduledStartDate) {
+    const later = new Date();
+    later.setDate(later.getDate() + 1);
+    scheduledStartDate.value = later.toISOString().split("T")[0];
+  }
 }
 
 function formatPhone(value) {
@@ -116,12 +150,18 @@ function makeCheckoutDate() {
   return date.toISOString();
 }
 
+function makeScheduledStartDate(dateValue) {
+  const date = new Date(`${dateValue}T06:00:00`);
+  return date.toISOString();
+}
+
 function makeReturnDate(dateValue) {
   const date = new Date(`${dateValue}T17:00:00`);
   return date.toISOString();
 }
 
 function formatDate(dateString) {
+  if (!dateString) return "";
   return new Date(dateString).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -130,6 +170,7 @@ function formatDate(dateString) {
 }
 
 function formatDateTime(dateString) {
+  if (!dateString) return "";
   return new Date(dateString).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -139,13 +180,19 @@ function formatDateTime(dateString) {
   });
 }
 
+function getCheckoutStartForDisplay(checkout) {
+  return checkout.checkoutStartAt || checkout.checkedOutAt;
+}
+
 function showView(viewName) {
   dashboardView.classList.add("hidden");
   recordsView.classList.add("hidden");
+  requestView.classList.add("hidden");
   adminView.classList.add("hidden");
 
   dashboardBtn.classList.remove("active");
   recordsBtn.classList.remove("active");
+  requestBtn.classList.remove("active");
   adminBtn.classList.remove("active");
 
   if (viewName === "dashboard") {
@@ -157,6 +204,11 @@ function showView(viewName) {
     recordsView.classList.remove("hidden");
     recordsBtn.classList.add("active");
     renderRecordsTable();
+  }
+
+  if (viewName === "request") {
+    requestView.classList.remove("hidden");
+    requestBtn.classList.add("active");
   }
 
   if (viewName === "admin") {
@@ -186,6 +238,10 @@ async function seedDefaultToolsIfNeeded() {
   });
 
   await Promise.all(writes);
+}
+
+function isToolCurrentlyOut(toolName) {
+  return checkouts.some(checkout => checkout.status === "out" && checkout.tool === toolName);
 }
 
 function getVisibleTools() {
@@ -225,12 +281,13 @@ function renderToolPicker() {
 
   visibleTools.forEach(tool => {
     const isSelected = selectedTool.value === tool.name;
+    const isOut = isToolCurrentlyOut(tool.name);
 
     toolList.innerHTML += `
-      <button type="button" class="tool-option ${isSelected ? "selected" : ""}" data-tool="${escapeHTML(tool.name)}" data-category="${escapeHTML(tool.category)}">
+      <button type="button" class="tool-option ${isSelected ? "selected" : ""} ${isOut ? "unavailable" : ""}" data-tool="${escapeHTML(tool.name)}" data-category="${escapeHTML(tool.category)}" data-out="${isOut}">
         <span class="tool-option-copy">
           <strong>${escapeHTML(tool.name)}</strong>
-          <small>${CATEGORY_LABELS[tool.category]}</small>
+          <small>${CATEGORY_LABELS[tool.category]}${isOut ? " • Currently checked out" : ""}</small>
         </span>
         <span class="tool-option-check">${isSelected ? "✓" : ""}</span>
       </button>
@@ -239,6 +296,11 @@ function renderToolPicker() {
 
   document.querySelectorAll(".tool-option").forEach(button => {
     button.addEventListener("click", () => {
+      if (button.dataset.out === "true") {
+        alert("This tool is currently checked out. You can still see it here, but it is not available until it is returned.");
+        return;
+      }
+
       selectedTool.value = button.dataset.tool;
       selectedToolLabel.innerText = button.dataset.tool;
       selectedToolCategoryLabel.innerText = CATEGORY_LABELS[button.dataset.category] || "Selected tool";
@@ -303,12 +365,18 @@ function getActiveCheckouts() {
   return checkouts.filter(checkout => checkout.status === "out");
 }
 
+function getScheduledCheckouts() {
+  return checkouts.filter(checkout => checkout.status === "scheduled");
+}
+
 function refreshEverything() {
   document.getElementById("checkedOutCount").innerText = getActiveCheckouts().length;
   renderActiveCards();
+  renderScheduledCards();
   renderRecordsTable();
   renderEmailQueue();
   renderAdminToolsList();
+  renderToolPicker();
 }
 
 function renderActiveCards() {
@@ -372,13 +440,76 @@ function renderActiveCards() {
   });
 }
 
-function renderRecordsTable() {
-  if (!recordsTable) return;
+function renderScheduledCards() {
+  if (!scheduledGrid) return;
 
+  const scheduled = getScheduledCheckouts();
+  scheduledGrid.innerHTML = "";
+
+  if (scheduled.length === 0) {
+    scheduledGrid.innerHTML = `
+      <article class="component-card">
+        <div class="placeholder-image">
+          <div class="placeholder-box">
+            <div class="placeholder-icon">📅</div>
+            <div class="placeholder-label">No Scheduled Checkouts</div>
+          </div>
+        </div>
+
+        <div class="component-info">
+          <h3>No dibs yet</h3>
+          <p>Future reservations will appear here without marking the tool unavailable until the start date.</p>
+        </div>
+      </article>
+    `;
+    return;
+  }
+
+  scheduled.forEach(checkout => {
+    scheduledGrid.innerHTML += `
+      <article class="component-card scheduled-card">
+        <div class="placeholder-image">
+          <div class="placeholder-box">
+            <div class="placeholder-icon">📌</div>
+            <div class="placeholder-label">${escapeHTML(checkout.tool)}</div>
+          </div>
+        </div>
+
+        <div class="component-info">
+          <h3>${escapeHTML(checkout.tool)}</h3>
+          <p><strong>Reserved by:</strong> ${escapeHTML(checkout.name)}</p>
+          <p><strong>Email:</strong> ${escapeHTML(checkout.email)}</p>
+          <p><strong>Phone:</strong> ${escapeHTML(checkout.phoneFormatted)}</p>
+          <p><strong>Start:</strong> ${formatDate(getCheckoutStartForDisplay(checkout))}</p>
+          <p><strong>Expected return:</strong> ${formatDate(checkout.expectedReturnAt)}</p>
+
+          <div class="tool-actions single-action">
+            <button class="return-btn" data-action="cancel" data-id="${checkout.id}">
+              Cancel Scheduled Checkout
+            </button>
+          </div>
+        </div>
+      </article>
+    `;
+  });
+
+  document.querySelectorAll('[data-action="cancel"]').forEach(button => {
+    button.addEventListener("click", () => {
+      openVerifyModal(button.dataset.id, "cancel");
+    });
+  });
+}
+
+function getFilteredRecords() {
   const queryText = searchInput.value.toLowerCase().trim();
   const filter = statusFilter.value;
+  const startValue = recordStartDate?.value;
+  const endValue = recordEndDate?.value;
 
-  const filtered = checkouts.filter(checkout => {
+  const startDate = startValue ? new Date(`${startValue}T00:00:00`) : null;
+  const endDate = endValue ? new Date(`${endValue}T23:59:59`) : null;
+
+  return checkouts.filter(checkout => {
     const searchable = `
       ${checkout.name}
       ${checkout.email}
@@ -387,8 +518,35 @@ function renderRecordsTable() {
       ${checkout.status}
     `.toLowerCase();
 
-    return searchable.includes(queryText) && (filter === "all" || checkout.status === filter);
+    const recordDate = new Date(getCheckoutStartForDisplay(checkout) || checkout.createdAt?.toDate?.() || checkout.returnedAt || Date.now());
+
+    const matchesText = searchable.includes(queryText);
+    const matchesStatus = filter === "all" || checkout.status === filter;
+    const matchesStart = !startDate || recordDate >= startDate;
+    const matchesEnd = !endDate || recordDate <= endDate;
+
+    return matchesText && matchesStatus && matchesStart && matchesEnd;
   });
+}
+
+function statusLabel(status) {
+  if (status === "out") return "Checked Out";
+  if (status === "scheduled") return "Scheduled";
+  if (status === "cancelled") return "Cancelled";
+  return "Returned";
+}
+
+function statusClass(status) {
+  if (status === "out") return "out";
+  if (status === "scheduled") return "scheduled";
+  if (status === "cancelled") return "cancelled";
+  return "good";
+}
+
+function renderRecordsTable() {
+  if (!recordsTable) return;
+
+  const filtered = getFilteredRecords();
 
   recordsTable.innerHTML = "";
 
@@ -404,11 +562,11 @@ function renderRecordsTable() {
         <td>${escapeHTML(checkout.name)}</td>
         <td>${escapeHTML(checkout.email)}</td>
         <td>${escapeHTML(checkout.phoneFormatted)}</td>
-        <td>${formatDateTime(checkout.checkedOutAt)}</td>
+        <td>${formatDateTime(getCheckoutStartForDisplay(checkout))}</td>
         <td>${formatDateTime(checkout.expectedReturnAt)}</td>
         <td>
-          <span class="status-badge ${checkout.status === "out" ? "out" : "good"}">
-            ${checkout.status === "out" ? "Checked Out" : "Returned"}
+          <span class="status-badge ${statusClass(checkout.status)}">
+            ${statusLabel(checkout.status)}
           </span>
         </td>
       </tr>
@@ -422,16 +580,24 @@ function openVerifyModal(id, action) {
 
   pendingAction = { id, action };
 
-  document.getElementById("modalEyebrow").innerText = action === "extend" ? "Extend Rental" : "Return Tool";
-  document.getElementById("modalTitle").innerText = action === "extend" ? "Extend Tool Rental" : "Return Tool";
+  const isExtend = action === "extend";
+  const isReturn = action === "return";
+  const isCancel = action === "cancel";
+
+  document.getElementById("modalEyebrow").innerText = isExtend ? "Extend Rental" : isCancel ? "Cancel Reservation" : "Return Tool";
+  document.getElementById("modalTitle").innerText = isExtend ? "Extend Tool Rental" : isCancel ? "Cancel Scheduled Checkout" : "Return Tool";
 
   verifyEmailPrefix.value = "";
   verifyPhoneNumber.value = "";
   verifyError.classList.add("hidden");
 
-  extendDateWrap.classList.toggle("hidden", action !== "extend");
+  extendDateWrap.classList.toggle("hidden", !isExtend);
+  returnDamageRow.classList.toggle("hidden", !isReturn);
+  returnDamageWrap.classList.add("hidden");
+  damageAtReturn.checked = false;
+  returnDamageComment.value = "";
 
-  if (action === "extend") {
+  if (isExtend) {
     const currentReturn = new Date(checkout.expectedReturnAt);
     currentReturn.setDate(currentReturn.getDate() + 1);
     newReturnDate.value = currentReturn.toISOString().split("T")[0];
@@ -460,10 +626,31 @@ async function confirmVerifiedAction() {
   }
 
   if (pendingAction.action === "return") {
+    if (damageAtReturn.checked && !returnDamageComment.value.trim()) {
+      alert("Please describe the damage or missing items before submitting.");
+      return;
+    }
+
     await updateDoc(doc(db, "checkouts", checkout.id), {
       status: "returned",
-      returnedAt: new Date().toISOString()
+      returnedAt: new Date().toISOString(),
+      damageAtReturn: damageAtReturn.checked,
+      returnDamageComment: returnDamageComment.value.trim()
     });
+
+    if (damageAtReturn.checked) {
+      await addDoc(collection(db, "damageReports"), {
+        checkoutId: checkout.id,
+        tool: checkout.tool,
+        reportType: "Return",
+        name: checkout.name,
+        email: checkout.email,
+        phoneFormatted: checkout.phoneFormatted,
+        phoneDigits: checkout.phoneDigits,
+        comment: returnDamageComment.value.trim(),
+        createdAt: serverTimestamp()
+      });
+    }
   }
 
   if (pendingAction.action === "extend") {
@@ -475,6 +662,13 @@ async function confirmVerifiedAction() {
       reminderReturnDaySent: false,
       lateNoticeSent: false,
       extendedAt: new Date().toISOString()
+    });
+  }
+
+  if (pendingAction.action === "cancel") {
+    await updateDoc(doc(db, "checkouts", checkout.id), {
+      status: "cancelled",
+      cancelledAt: new Date().toISOString()
     });
   }
 
@@ -496,31 +690,43 @@ function renderEmailQueue() {
   if (!emailQueue || !isLoggedIn) return;
 
   const active = getActiveCheckouts();
+  const scheduled = getScheduledCheckouts();
+  const queueItems = [...active, ...scheduled];
+
   emailQueue.innerHTML = "";
 
-  if (active.length === 0) {
+  if (queueItems.length === 0) {
     emailQueue.innerHTML = `
       <div class="admin-item">
         <div class="admin-item-header">
           <strong>No active email reminders</strong>
         </div>
-        <p class="muted">Reminder emails will appear once tools are checked out.</p>
+        <p class="muted">Reminder emails will appear once tools are checked out or scheduled.</p>
       </div>
     `;
     return;
   }
 
-  active.forEach(checkout => {
+  queueItems.forEach(checkout => {
     emailQueue.innerHTML += `
       <div class="admin-item">
         <div class="admin-item-header">
           <strong>${escapeHTML(checkout.tool)}</strong>
-          <span class="status-badge out">Active</span>
+          <span class="status-badge ${statusClass(checkout.status)}">${statusLabel(checkout.status)}</span>
         </div>
         <p class="muted"><strong>To:</strong> ${escapeHTML(checkout.email)}</p>
-        <p class="muted"><strong>24h reminder:</strong> ${checkout.reminder24Sent ? "Sent" : "Pending"}</p>
-        <p class="muted"><strong>Return-day reminder:</strong> ${checkout.reminderReturnDaySent ? "Sent" : "Pending"}</p>
-        <p class="muted"><strong>Late notice:</strong> ${checkout.lateNoticeSent ? "Sent" : "Pending"}</p>
+        ${
+          checkout.status === "scheduled"
+            ? `
+              <p class="muted"><strong>Reservation reminder:</strong> ${checkout.scheduledReminderSent ? "Sent" : "Pending"}</p>
+              <p class="muted"><strong>Start-day email:</strong> ${checkout.startDayEmailSent ? "Sent" : "Pending"}</p>
+            `
+            : `
+              <p class="muted"><strong>24h reminder:</strong> ${checkout.reminder24Sent ? "Sent" : "Pending"}</p>
+              <p class="muted"><strong>Return-day reminder:</strong> ${checkout.reminderReturnDaySent ? "Sent" : "Pending"}</p>
+              <p class="muted"><strong>Late notice:</strong> ${checkout.lateNoticeSent ? "Sent" : "Pending"}</p>
+            `
+        }
       </div>
     `;
   });
@@ -534,12 +740,149 @@ function escapeHTML(value) {
     .replaceAll(">", "&gt;");
 }
 
+function setCheckoutMode(mode) {
+  checkoutMode = mode;
+
+  checkoutNowTab.classList.toggle("active", mode === "now");
+  checkoutLaterTab.classList.toggle("active", mode === "later");
+  scheduledStartWrap.classList.toggle("hidden", mode !== "later");
+
+  checkoutSubmitBtn.innerText = mode === "later" ? "Call Dibs / Schedule Checkout" : "Check Out Tool";
+
+  if (mode === "later") {
+    scheduledStartDate.required = true;
+  } else {
+    scheduledStartDate.required = false;
+  }
+}
+
+function resetCheckoutForm() {
+  checkoutForm.reset();
+  selectedTool.value = "";
+  selectedToolLabel.innerText = "Select a tool";
+  selectedToolCategoryLabel.innerText = "Search or choose from a category";
+  toolSearchInput.value = "";
+  toolSearchQuery = "";
+  activeToolCategory = "all";
+  checkoutDamageWrap.classList.add("hidden");
+  setDefaultReturnDate();
+  renderToolPicker();
+}
+
+function buildExportHtml(records) {
+  const rows = records.map(checkout => `
+    <tr>
+      <td>${escapeHTML(checkout.tool)}</td>
+      <td>${escapeHTML(checkout.name)}</td>
+      <td>${escapeHTML(checkout.email)}</td>
+      <td>${escapeHTML(checkout.phoneFormatted)}</td>
+      <td>${formatDateTime(getCheckoutStartForDisplay(checkout))}</td>
+      <td>${formatDateTime(checkout.expectedReturnAt)}</td>
+      <td>${statusLabel(checkout.status)}</td>
+    </tr>
+  `).join("");
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ADB Tool Checkout Records</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 28px; color: #111827; }
+    h1 { margin-bottom: 4px; }
+    p { color: #4b5563; }
+    table { width: 100%; border-collapse: collapse; margin-top: 22px; }
+    th { background: #111827; color: white; text-align: left; }
+    th, td { border: 1px solid #e5e7eb; padding: 10px; font-size: 13px; }
+    tr:nth-child(even) { background: #f9fafb; }
+  </style>
+</head>
+<body>
+  <h1>ADB Tool Checkout Records</h1>
+  <p>Exported ${new Date().toLocaleString()}</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Tool</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Checked Out / Start</th>
+        <th>Expected Return</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows || `<tr><td colspan="7">No records found.</td></tr>`}
+    </tbody>
+  </table>
+</body>
+</html>
+  `;
+}
+
+function downloadTextFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  URL.revokeObjectURL(url);
+}
+
+function exportHtmlRecords() {
+  const records = getFilteredRecords();
+  downloadTextFile("adb-tool-checkout-records.html", buildExportHtml(records), "text/html");
+}
+
+function exportPdfRecords() {
+  const records = getFilteredRecords();
+  const exportWindow = window.open("", "_blank");
+
+  if (!exportWindow) {
+    alert("Popup blocked. Please allow popups to export PDF.");
+    return;
+  }
+
+  exportWindow.document.open();
+  exportWindow.document.write(buildExportHtml(records));
+  exportWindow.document.close();
+
+  exportWindow.onload = () => {
+    exportWindow.focus();
+    exportWindow.print();
+  };
+}
+
 phoneNumber.addEventListener("input", () => {
   phoneNumber.value = formatPhone(phoneNumber.value);
 });
 
 verifyPhoneNumber.addEventListener("input", () => {
   verifyPhoneNumber.value = formatPhone(verifyPhoneNumber.value);
+});
+
+if (requestPhoneNumber) {
+  requestPhoneNumber.addEventListener("input", () => {
+    requestPhoneNumber.value = formatPhone(requestPhoneNumber.value);
+  });
+}
+
+checkoutNowTab.addEventListener("click", () => setCheckoutMode("now"));
+checkoutLaterTab.addEventListener("click", () => setCheckoutMode("later"));
+
+damageAtCheckout.addEventListener("change", () => {
+  checkoutDamageWrap.classList.toggle("hidden", !damageAtCheckout.checked);
+});
+
+damageAtReturn.addEventListener("change", () => {
+  returnDamageWrap.classList.toggle("hidden", !damageAtReturn.checked);
 });
 
 checkoutForm.addEventListener("submit", async event => {
@@ -550,9 +893,37 @@ checkoutForm.addEventListener("submit", async event => {
   const phoneFormatted = formatPhone(phoneNumber.value);
   const digits = phoneDigits(phoneNumber.value);
   const tool = selectedTool.value.trim();
+  const hasCheckoutDamage = damageAtCheckout.checked;
+  const checkoutDamageText = checkoutDamageComment.value.trim();
 
   if (!name || !emailPrefix || digits.length !== 10 || !tool || !expectedReturnDate.value) {
     alert("Please complete every field. Phone number must be 10 digits and a tool must be selected.");
+    return;
+  }
+
+  if (checkoutMode === "later" && !scheduledStartDate.value) {
+    alert("Please select the scheduled checkout start date.");
+    return;
+  }
+
+  if (hasCheckoutDamage && !checkoutDamageText) {
+    alert("Please describe the damage or missing items before submitting.");
+    return;
+  }
+
+  if (isToolCurrentlyOut(tool)) {
+    alert("This tool is currently checked out and unavailable.");
+    return;
+  }
+
+  const checkoutStartAt = checkoutMode === "later"
+    ? makeScheduledStartDate(scheduledStartDate.value)
+    : makeCheckoutDate();
+
+  const expectedReturnAt = makeReturnDate(expectedReturnDate.value);
+
+  if (new Date(expectedReturnAt) <= new Date(checkoutStartAt)) {
+    alert("Expected return date must be after the checkout start date.");
     return;
   }
 
@@ -562,26 +933,68 @@ checkoutForm.addEventListener("submit", async event => {
     phoneFormatted,
     phoneDigits: digits,
     tool,
-    checkedOutAt: makeCheckoutDate(),
-    expectedReturnAt: makeReturnDate(expectedReturnDate.value),
-    status: "out",
+    checkedOutAt: checkoutMode === "later" ? null : checkoutStartAt,
+    checkoutStartAt,
+    expectedReturnAt,
+    status: checkoutMode === "later" ? "scheduled" : "out",
     returnedAt: null,
+    cancelledAt: null,
+    damageAtCheckout: hasCheckoutDamage,
+    damageComment: checkoutDamageText,
     reminder24Sent: false,
     reminderReturnDaySent: false,
     lateNoticeSent: false,
+    scheduledReminderSent: false,
+    startDayEmailSent: false,
     createdAt: serverTimestamp()
   });
 
-  checkoutForm.reset();
-  selectedTool.value = "";
-  selectedToolLabel.innerText = "Select a tool";
-  selectedToolCategoryLabel.innerText = "Search or choose from a category";
-  toolSearchInput.value = "";
-  toolSearchQuery = "";
-  activeToolCategory = "all";
-  renderToolPicker();
-  setDefaultReturnDate();
+  if (hasCheckoutDamage) {
+    await addDoc(collection(db, "damageReports"), {
+      tool,
+      reportType: checkoutMode === "later" ? "Scheduled Checkout" : "Checkout",
+      name,
+      email: getFullEmail(emailPrefix),
+      phoneFormatted,
+      phoneDigits: digits,
+      comment: checkoutDamageText,
+      createdAt: serverTimestamp()
+    });
+  }
+
+  resetCheckoutForm();
 });
+
+if (requestForm) {
+  requestForm.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const name = requestName.value.trim();
+    const emailPrefix = requestEmailPrefix.value.trim();
+    const phoneFormatted = formatPhone(requestPhoneNumber.value);
+    const digits = phoneDigits(requestPhoneNumber.value);
+    const type = requestType.value;
+    const comment = requestComment.value.trim();
+
+    if (!name || !emailPrefix || digits.length !== 10 || !type || !comment) {
+      alert("Please complete every field. Phone number must be 10 digits.");
+      return;
+    }
+
+    await addDoc(collection(db, "requests"), {
+      name,
+      email: getFullEmail(emailPrefix),
+      phoneFormatted,
+      phoneDigits: digits,
+      type,
+      comment,
+      createdAt: serverTimestamp()
+    });
+
+    requestForm.reset();
+    alert("Request submitted.");
+  });
+}
 
 addToolForm.addEventListener("submit", async event => {
   event.preventDefault();
@@ -615,10 +1028,23 @@ toolSearchInput.addEventListener("input", () => {
 dashboardBtn.addEventListener("click", () => showView("dashboard"));
 logoHomeBtn.addEventListener("click", () => showView("dashboard"));
 recordsBtn.addEventListener("click", () => showView("records"));
+requestBtn.addEventListener("click", () => showView("request"));
 adminBtn.addEventListener("click", () => showView("admin"));
 
 searchInput.addEventListener("input", renderRecordsTable);
 statusFilter.addEventListener("change", renderRecordsTable);
+
+if (recordStartDate) recordStartDate.addEventListener("change", renderRecordsTable);
+if (recordEndDate) recordEndDate.addEventListener("change", renderRecordsTable);
+
+document.getElementById("clearDateFiltersBtn").addEventListener("click", () => {
+  recordStartDate.value = "";
+  recordEndDate.value = "";
+  renderRecordsTable();
+});
+
+document.getElementById("exportHtmlBtn").addEventListener("click", exportHtmlRecords);
+document.getElementById("exportPdfBtn").addEventListener("click", exportPdfRecords);
 
 closeModalBtn.addEventListener("click", closeVerifyModal);
 confirmVerifyBtn.addEventListener("click", confirmVerifiedAction);
@@ -648,12 +1074,12 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
 });
 
 document.getElementById("clearReturnedBtn").addEventListener("click", async () => {
-  const confirmed = confirm("Clear all returned checkout records?");
+  const confirmed = confirm("Clear all returned and cancelled checkout records?");
   if (!confirmed) return;
 
-  const returned = checkouts.filter(checkout => checkout.status === "returned");
+  const oldRecords = checkouts.filter(checkout => checkout.status === "returned" || checkout.status === "cancelled");
 
-  for (const checkout of returned) {
+  for (const checkout of oldRecords) {
     await deleteDoc(doc(db, "checkouts", checkout.id));
   }
 });
@@ -696,4 +1122,5 @@ onSnapshot(query(collection(db, "tools"), orderBy("createdAt", "asc")), snapshot
 
 seedDefaultToolsIfNeeded();
 setDefaultReturnDate();
+setCheckoutMode("now");
 showView("dashboard");
