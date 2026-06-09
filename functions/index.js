@@ -8,7 +8,7 @@ admin.initializeApp();
 
 const SENDGRID_API_KEY = defineSecret("SENDGRID_API_KEY");
 
-const FROM_EMAIL = "no-reply@adb-us.com";
+const FROM_EMAIL = "jbrecknock@adb-us.com";
 const AJ_EMAIL = "ajkwasek@adb-us.com";
 const NICK_EMAIL = "nharbacek@adb-us.com";
 
