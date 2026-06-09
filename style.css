@@ -355,10 +355,26 @@ main {
   cursor: pointer;
 }
 
-.checkbox-row input {
+.checkbox-row input[type="checkbox"] {
+
   width: 18px;
+
   height: 18px;
+
+  min-width: 18px;
+
+  flex: 0 0 18px;
+
   accent-color: var(--orange);
+
+}
+
+.checkbox-row span {
+
+  flex: 1;
+
+  line-height: 1.25;
+
 }
 
 .damage-comment-wrap {
