@@ -19,6 +19,7 @@
   <nav class="nav-actions">
     <button id="dashboardBtn" class="nav-btn active">Dashboard</button>
     <button id="recordsBtn" class="nav-btn">Records</button>
+    <button id="tallyBtn" class="nav-btn">Tool Tally</button>
     <button id="requestBtn" class="nav-btn">Requests</button>
     <button id="adminBtn" class="nav-btn">Admin</button>
   </nav>
@@ -128,9 +129,7 @@
         <p class="eyebrow">Currently Out</p>
         <h2>Active Checkouts</h2>
       </div>
-      <p class="muted">
-        Only T-3 or foremen can check out tools - you are responsible for everything checked out in your name.
-      </p>
+      <p class="muted">Only T-3 or foremen can check out tools — you are responsible for everything checked out in your name!</p>
     </div>
 
     <div id="activeGrid" class="component-grid"></div>
@@ -199,13 +198,39 @@
     </div>
   </section>
 
+  <section id="tallyView" class="view hidden">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Inventory</p>
+        <h2>Tool Tally</h2>
+      </div>
+      <p class="muted">View all tools and report damaged or missing equipment.</p>
+    </div>
+
+    <div class="checkout-card">
+      <div class="tool-search-wrap tally-search-wrap">
+        <span>⌕</span>
+        <input id="tallySearchInput" type="text" placeholder="Search tools..." />
+      </div>
+
+      <div class="tool-category-tabs tally-tabs">
+        <button type="button" class="tool-tab tally-tool-tab active" data-category="all">All</button>
+        <button type="button" class="tool-tab tally-tool-tab" data-category="spareTools">Spare Tools</button>
+        <button type="button" class="tool-tab tally-tool-tab" data-category="safetyEquipment">Safety</button>
+        <button type="button" class="tool-tab tally-tool-tab" data-category="testingEquipment">Testing</button>
+      </div>
+
+      <div id="tallyToolList" class="tally-tool-list"></div>
+    </div>
+  </section>
+
   <section id="requestView" class="view hidden">
     <div class="section-heading">
       <div>
         <p class="eyebrow">Requests</p>
         <h2>General Request / Comment</h2>
       </div>
-      <p class="muted">Request a new tool or send a general comment to Nick and AJ.</p>
+      <p class="muted">Request a new tool or send a general comment to supervisors.</p>
     </div>
 
     <div class="checkout-card">
@@ -330,6 +355,35 @@
       <p id="verifyError" class="error-text hidden">That email or phone number does not match this checkout.</p>
 
       <button id="confirmVerifyBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toolStatusModal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closeToolStatusModalBtn" class="modal-close">×</button>
+    <p class="eyebrow">Tool Status</p>
+    <h2 id="toolStatusTitle">Report Tool Issue</h2>
+    <p class="muted">Report a tool as damaged or missing. This will make it unavailable for checkout.</p>
+
+    <div class="modal-form">
+      <input id="toolStatusName" placeholder="Your name" />
+
+      <div class="email-row">
+        <input id="toolStatusEmailPrefix" placeholder="email name" />
+        <span>@adb-us.com</span>
+      </div>
+
+      <input id="toolStatusPhoneNumber" placeholder="Phone number" maxlength="14" />
+
+      <select id="toolStatusType">
+        <option value="damaged">Damaged</option>
+        <option value="missing">Missing</option>
+      </select>
+
+      <textarea id="toolStatusComment" placeholder="Describe what is damaged or missing..."></textarea>
+
+      <button id="submitToolStatusBtn">Submit Report</button>
     </div>
   </div>
 </div>

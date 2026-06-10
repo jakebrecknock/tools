@@ -39,16 +39,20 @@ let tools = [];
 let isLoggedIn = false;
 let pendingAction = null;
 let activeToolCategory = "all";
+let tallyToolCategory = "all";
 let toolSearchQuery = "";
+let tallySearchQuery = "";
 let checkoutMode = "now";
 
 const dashboardView = document.getElementById("dashboardView");
 const recordsView = document.getElementById("recordsView");
+const tallyView = document.getElementById("tallyView");
 const requestView = document.getElementById("requestView");
 const adminView = document.getElementById("adminView");
 
 const dashboardBtn = document.getElementById("dashboardBtn");
 const recordsBtn = document.getElementById("recordsBtn");
+const tallyBtn = document.getElementById("tallyBtn");
 const requestBtn = document.getElementById("requestBtn");
 const adminBtn = document.getElementById("adminBtn");
 const logoHomeBtn = document.getElementById("logoHomeBtn");
@@ -81,6 +85,9 @@ const selectedToolCategoryLabel = document.getElementById("selectedToolCategoryL
 const toolList = document.getElementById("toolList");
 const toolSearchInput = document.getElementById("toolSearchInput");
 
+const tallyToolList = document.getElementById("tallyToolList");
+const tallySearchInput = document.getElementById("tallySearchInput");
+
 const verifyModal = document.getElementById("verifyModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
 const confirmVerifyBtn = document.getElementById("confirmVerifyBtn");
@@ -95,6 +102,16 @@ const damageAtReturn = document.getElementById("damageAtReturn");
 const returnDamageWrap = document.getElementById("returnDamageWrap");
 const returnDamageComment = document.getElementById("returnDamageComment");
 
+const toolStatusModal = document.getElementById("toolStatusModal");
+const closeToolStatusModalBtn = document.getElementById("closeToolStatusModalBtn");
+const submitToolStatusBtn = document.getElementById("submitToolStatusBtn");
+const toolStatusTitle = document.getElementById("toolStatusTitle");
+const toolStatusName = document.getElementById("toolStatusName");
+const toolStatusEmailPrefix = document.getElementById("toolStatusEmailPrefix");
+const toolStatusPhoneNumber = document.getElementById("toolStatusPhoneNumber");
+const toolStatusType = document.getElementById("toolStatusType");
+const toolStatusComment = document.getElementById("toolStatusComment");
+
 const requestForm = document.getElementById("requestForm");
 const requestName = document.getElementById("requestName");
 const requestEmailPrefix = document.getElementById("requestEmailPrefix");
@@ -106,6 +123,8 @@ const addToolForm = document.getElementById("addToolForm");
 const newToolName = document.getElementById("newToolName");
 const newToolCategory = document.getElementById("newToolCategory");
 const adminToolsList = document.getElementById("adminToolsList");
+
+let pendingToolStatusToolId = null;
 
 function setDefaultReturnDate() {
   const tomorrow = new Date();
@@ -202,14 +221,26 @@ function getToolIcon(toolName) {
   return "🧰";
 }
 
+function isToolUnavailable(tool) {
+  return tool.status === "damaged" || tool.status === "missing";
+}
+
+function toolStatusLabel(tool) {
+  if (tool.status === "damaged") return "Damaged";
+  if (tool.status === "missing") return "Missing";
+  return "Available";
+}
+
 function showView(viewName) {
   dashboardView.classList.add("hidden");
   recordsView.classList.add("hidden");
+  tallyView.classList.add("hidden");
   requestView.classList.add("hidden");
   adminView.classList.add("hidden");
 
   dashboardBtn.classList.remove("active");
   recordsBtn.classList.remove("active");
+  tallyBtn.classList.remove("active");
   requestBtn.classList.remove("active");
   adminBtn.classList.remove("active");
 
@@ -222,6 +253,12 @@ function showView(viewName) {
     recordsView.classList.remove("hidden");
     recordsBtn.classList.add("active");
     renderRecordsTable();
+  }
+
+  if (viewName === "tally") {
+    tallyView.classList.remove("hidden");
+    tallyBtn.classList.add("active");
+    renderToolTally();
   }
 
   if (viewName === "request") {
@@ -249,6 +286,7 @@ async function seedDefaultToolsIfNeeded() {
         setDoc(doc(db, "tools", toolId), {
           name,
           category,
+          status: "available",
           createdAt: serverTimestamp()
         })
       );
@@ -341,6 +379,22 @@ function getVisibleTools() {
     });
 }
 
+function getVisibleTallyTools() {
+  return tools
+    .filter(tool => {
+      const matchesCategory = tallyToolCategory === "all" || tool.category === tallyToolCategory;
+      const matchesSearch = tool.name.toLowerCase().includes(tallySearchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      if (a.category !== b.category) {
+        return CATEGORY_LABELS[a.category].localeCompare(CATEGORY_LABELS[b.category]);
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+}
+
 function renderToolPicker() {
   document.querySelectorAll(".tool-tab").forEach(tab => {
     tab.classList.toggle("active", tab.dataset.category === activeToolCategory);
@@ -363,12 +417,13 @@ function renderToolPicker() {
   visibleTools.forEach(tool => {
     const isSelected = selectedTool.value === tool.name;
     const isOut = isToolCurrentlyOut(tool.name);
+    const unavailable = isToolUnavailable(tool);
 
     toolList.innerHTML += `
-      <button type="button" class="tool-option ${isSelected ? "selected" : ""} ${isOut ? "unavailable" : ""}" data-tool="${escapeHTML(tool.name)}" data-category="${escapeHTML(tool.category)}" data-out="${isOut}">
+      <button type="button" class="tool-option ${isSelected ? "selected" : ""} ${isOut || unavailable ? "unavailable" : ""} ${unavailable ? "damaged-tool" : ""}" data-tool="${escapeHTML(tool.name)}" data-category="${escapeHTML(tool.category)}" data-out="${isOut}" data-unavailable="${unavailable}">
         <span class="tool-option-copy">
           <strong>${escapeHTML(tool.name)}</strong>
-          <small>${CATEGORY_LABELS[tool.category]}${isOut ? " • Currently checked out" : ""}</small>
+          <small>${CATEGORY_LABELS[tool.category]}${isOut ? " • Currently checked out" : ""}${unavailable ? ` • ${toolStatusLabel(tool)}` : ""}</small>
         </span>
         <span class="tool-option-check">${isSelected ? "✓" : ""}</span>
       </button>
@@ -377,6 +432,11 @@ function renderToolPicker() {
 
   document.querySelectorAll(".tool-option").forEach(button => {
     button.addEventListener("click", () => {
+      if (button.dataset.unavailable === "true") {
+        alert("This tool is marked as damaged or missing and cannot be checked out.");
+        return;
+      }
+
       if (button.dataset.out === "true") {
         alert("This tool is currently checked out. You can still see it here, but it is not available until it is returned.");
         return;
@@ -389,6 +449,137 @@ function renderToolPicker() {
       renderToolPicker();
     });
   });
+}
+
+function renderToolTally() {
+  if (!tallyToolList) return;
+
+  document.querySelectorAll(".tally-tool-tab").forEach(tab => {
+    tab.classList.toggle("active", tab.dataset.category === tallyToolCategory);
+  });
+
+  const visibleTools = getVisibleTallyTools();
+
+  tallyToolList.innerHTML = "";
+
+  if (visibleTools.length === 0) {
+    tallyToolList.innerHTML = `
+      <div class="empty-tool-message">
+        <strong>No tools found</strong>
+        <span>Try another category or search term.</span>
+      </div>
+    `;
+    return;
+  }
+
+  visibleTools.forEach(tool => {
+    const unavailable = isToolUnavailable(tool);
+
+    tallyToolList.innerHTML += `
+      <div class="tally-tool-option ${unavailable ? "damaged-tool" : ""}">
+        <span class="tool-option-copy">
+          <strong>${escapeHTML(tool.name)}</strong>
+          <small>${CATEGORY_LABELS[tool.category]} • ${toolStatusLabel(tool)}${tool.statusComment ? ` • ${escapeHTML(tool.statusComment)}` : ""}</small>
+        </span>
+
+        <div class="tally-actions">
+          <button type="button" class="mini-status-btn" data-tool-id="${tool.id}" data-status="damaged">Report Damaged</button>
+          <button type="button" class="mini-delete-btn" data-tool-id="${tool.id}" data-status="missing">Report Missing</button>
+          ${
+            unavailable
+              ? `<button type="button" class="mini-clear-btn" data-tool-id="${tool.id}">Mark Available</button>`
+              : ""
+          }
+        </div>
+      </div>
+    `;
+  });
+
+  document.querySelectorAll("[data-status]").forEach(button => {
+    button.addEventListener("click", () => {
+      openToolStatusModal(button.dataset.toolId, button.dataset.status);
+    });
+  });
+
+  document.querySelectorAll(".mini-clear-btn").forEach(button => {
+    button.addEventListener("click", async () => {
+      const confirmed = confirm("Mark this tool as available again?");
+      if (!confirmed) return;
+
+      await updateDoc(doc(db, "tools", button.dataset.toolId), {
+        status: "available",
+        statusComment: "",
+        statusReportedBy: "",
+        statusReportedEmail: "",
+        statusReportedPhone: "",
+        statusUpdatedAt: new Date().toISOString()
+      });
+    });
+  });
+}
+
+function openToolStatusModal(toolId, status) {
+  const tool = tools.find(item => item.id === toolId);
+  if (!tool) return;
+
+  pendingToolStatusToolId = toolId;
+
+  toolStatusTitle.innerText = status === "missing" ? "Report Missing Tool" : "Report Damaged Tool";
+  toolStatusType.value = status;
+  toolStatusName.value = "";
+  toolStatusEmailPrefix.value = "";
+  toolStatusPhoneNumber.value = "";
+  toolStatusComment.value = "";
+  toolStatusComment.placeholder = status === "missing"
+    ? "Example: tool was not in gang box, missing from truck, cannot locate..."
+    : "Example: broken trigger, missing charger, damaged case...";
+
+  toolStatusModal.classList.remove("hidden");
+}
+
+function closeToolStatusModal() {
+  toolStatusModal.classList.add("hidden");
+  pendingToolStatusToolId = null;
+}
+
+async function submitToolStatusReport() {
+  const tool = tools.find(item => item.id === pendingToolStatusToolId);
+  if (!tool) return;
+
+  const name = toolStatusName.value.trim();
+  const emailPrefix = toolStatusEmailPrefix.value.trim();
+  const phoneFormatted = formatPhone(toolStatusPhoneNumber.value);
+  const digits = phoneDigits(toolStatusPhoneNumber.value);
+  const status = toolStatusType.value;
+  const comment = toolStatusComment.value.trim();
+
+  if (!name || !emailPrefix || digits.length !== 10 || !status || !comment) {
+    alert("Please complete every field. Phone number must be 10 digits.");
+    return;
+  }
+
+  await updateDoc(doc(db, "tools", tool.id), {
+    status,
+    statusComment: comment,
+    statusReportedBy: name,
+    statusReportedEmail: getFullEmail(emailPrefix),
+    statusReportedPhone: phoneFormatted,
+    statusUpdatedAt: new Date().toISOString()
+  });
+
+  await addDoc(collection(db, "damageReports"), {
+    tool: tool.name,
+    reportType: "Tool Tally",
+    toolStatus: status,
+    name,
+    email: getFullEmail(emailPrefix),
+    phoneFormatted,
+    phoneDigits: digits,
+    comment,
+    createdAt: serverTimestamp()
+  });
+
+  closeToolStatusModal();
 }
 
 function renderAdminToolsList() {
@@ -421,8 +612,8 @@ function renderAdminToolsList() {
             categoryTools.length === 0
               ? `<p class="muted">No tools in this section.</p>`
               : categoryTools.map(tool => `
-                  <div class="admin-tool-item">
-                    <span>${escapeHTML(tool.name)}</span>
+                  <div class="admin-tool-item ${isToolUnavailable(tool) ? "damaged-tool" : ""}">
+                    <span>${escapeHTML(tool.name)}${isToolUnavailable(tool) ? ` — ${toolStatusLabel(tool)}` : ""}</span>
                     <button class="mini-delete-btn" data-tool-id="${tool.id}">Delete</button>
                   </div>
                 `).join("")
@@ -450,6 +641,7 @@ function refreshEverything() {
   renderEmailQueue();
   renderAdminToolsList();
   renderToolPicker();
+  renderToolTally();
 }
 
 function renderActiveCards() {
@@ -712,10 +904,24 @@ async function confirmVerifiedAction() {
     });
 
     if (damageAtReturn.checked) {
+      const matchingTool = tools.find(tool => tool.name === checkout.tool);
+
+      if (matchingTool) {
+        await updateDoc(doc(db, "tools", matchingTool.id), {
+          status: "damaged",
+          statusComment: returnDamageComment.value.trim(),
+          statusReportedBy: checkout.name,
+          statusReportedEmail: checkout.email,
+          statusReportedPhone: checkout.phoneFormatted,
+          statusUpdatedAt: new Date().toISOString()
+        });
+      }
+
       await addDoc(collection(db, "damageReports"), {
         checkoutId: checkout.id,
         tool: checkout.tool,
         reportType: "Return",
+        toolStatus: "damaged",
         name: checkout.name,
         email: checkout.email,
         phoneFormatted: checkout.phoneFormatted,
@@ -959,6 +1165,12 @@ if (requestPhoneNumber) {
   });
 }
 
+if (toolStatusPhoneNumber) {
+  toolStatusPhoneNumber.addEventListener("input", () => {
+    toolStatusPhoneNumber.value = formatPhone(toolStatusPhoneNumber.value);
+  });
+}
+
 checkoutNowTab.addEventListener("click", () => setCheckoutMode("now"));
 checkoutLaterTab.addEventListener("click", () => setCheckoutMode("later"));
 
@@ -978,11 +1190,17 @@ checkoutForm.addEventListener("submit", async event => {
   const phoneFormatted = formatPhone(phoneNumber.value);
   const digits = phoneDigits(phoneNumber.value);
   const tool = selectedTool.value.trim();
+  const selectedToolRecord = tools.find(item => item.name === tool);
   const hasCheckoutDamage = damageAtCheckout.checked;
   const checkoutDamageText = checkoutDamageComment.value.trim();
 
   if (!name || !emailPrefix || digits.length !== 10 || !tool || !expectedReturnDate.value) {
     alert("Please complete every field. Phone number must be 10 digits and a tool must be selected.");
+    return;
+  }
+
+  if (selectedToolRecord && isToolUnavailable(selectedToolRecord)) {
+    alert("This tool is marked as damaged or missing and cannot be checked out.");
     return;
   }
 
@@ -1057,9 +1275,21 @@ checkoutForm.addEventListener("submit", async event => {
   });
 
   if (hasCheckoutDamage) {
+    if (selectedToolRecord) {
+      await updateDoc(doc(db, "tools", selectedToolRecord.id), {
+        status: "damaged",
+        statusComment: checkoutDamageText,
+        statusReportedBy: name,
+        statusReportedEmail: getFullEmail(emailPrefix),
+        statusReportedPhone: phoneFormatted,
+        statusUpdatedAt: new Date().toISOString()
+      });
+    }
+
     await addDoc(collection(db, "damageReports"), {
       tool,
       reportType: checkoutMode === "later" ? "Scheduled Checkout" : "Checkout",
+      toolStatus: "damaged",
       name,
       email: getFullEmail(emailPrefix),
       phoneFormatted,
@@ -1114,6 +1344,7 @@ addToolForm.addEventListener("submit", async event => {
   await addDoc(collection(db, "tools"), {
     name,
     category,
+    status: "available",
     createdAt: serverTimestamp()
   });
 
@@ -1127,14 +1358,29 @@ document.querySelectorAll(".tool-tab").forEach(tab => {
   });
 });
 
+document.querySelectorAll(".tally-tool-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    tallyToolCategory = tab.dataset.category;
+    renderToolTally();
+  });
+});
+
 toolSearchInput.addEventListener("input", () => {
   toolSearchQuery = toolSearchInput.value.trim();
   renderToolPicker();
 });
 
+if (tallySearchInput) {
+  tallySearchInput.addEventListener("input", () => {
+    tallySearchQuery = tallySearchInput.value.trim();
+    renderToolTally();
+  });
+}
+
 dashboardBtn.addEventListener("click", () => showView("dashboard"));
 logoHomeBtn.addEventListener("click", () => showView("dashboard"));
 recordsBtn.addEventListener("click", () => showView("records"));
+tallyBtn.addEventListener("click", () => showView("tally"));
 requestBtn.addEventListener("click", () => showView("request"));
 adminBtn.addEventListener("click", () => showView("admin"));
 
@@ -1155,6 +1401,14 @@ document.getElementById("exportPdfBtn").addEventListener("click", exportPdfRecor
 
 closeModalBtn.addEventListener("click", closeVerifyModal);
 confirmVerifyBtn.addEventListener("click", confirmVerifiedAction);
+
+if (closeToolStatusModalBtn) {
+  closeToolStatusModalBtn.addEventListener("click", closeToolStatusModal);
+}
+
+if (submitToolStatusBtn) {
+  submitToolStatusBtn.addEventListener("click", submitToolStatusReport);
+}
 
 document.getElementById("loginBtn").addEventListener("click", () => {
   const password = document.getElementById("passwordInput").value;
@@ -1220,10 +1474,12 @@ onSnapshot(query(collection(db, "checkouts"), orderBy("createdAt", "desc")), sna
 onSnapshot(query(collection(db, "tools"), orderBy("createdAt", "asc")), snapshot => {
   tools = snapshot.docs.map(item => ({
     id: item.id,
+    status: item.data().status || "available",
     ...item.data()
   }));
 
   renderToolPicker();
+  renderToolTally();
   renderAdminToolsList();
 });
 

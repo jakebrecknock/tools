@@ -9,9 +9,13 @@ admin.initializeApp();
 const SENDGRID_API_KEY = defineSecret("SENDGRID_API_KEY");
 
 const FROM_EMAIL = "jbrecknock@adb-us.com";
+
 const AJ_EMAIL = "ajkwasek@adb-us.com";
 const NICK_EMAIL = "nhharbacek@adb-us.com";
-const MANAGER_EMAILS = [AJ_EMAIL, NICK_EMAIL];
+const DEREK_EMAIL = "derek.pleva@adb-us.com";
+const EVAN_EMAIL = "eebay@adb-us.com";
+
+const SUPERVISOR_EMAILS = [AJ_EMAIL, NICK_EMAIL, DEREK_EMAIL, EVAN_EMAIL];
 
 function formatDate(date) {
   return date.toLocaleDateString("en-US", {
@@ -139,14 +143,20 @@ exports.sendDamageReport = onDocumentCreated(
 
     const report = event.data.data();
 
+    const reporterEmail = report.email || null;
+    const toList = reporterEmail ? [reporterEmail] : SUPERVISOR_EMAILS;
+    const ccList = reporterEmail ? SUPERVISOR_EMAILS : null;
+
     await sendEmail({
-      to: MANAGER_EMAILS,
-      subject: `Damage/Missing Item Report: ${report.tool || "Tool"}`,
+      to: toList,
+      cc: ccList,
+      subject: `Damage/Missing Tool Report: ${report.tool || "Tool"}`,
       text:
-`A damage or missing item report was submitted.
+`A damage or missing tool report was submitted.
 
 Tool: ${report.tool || ""}
 Report Type: ${report.reportType || ""}
+Tool Status: ${report.toolStatus || ""}
 Name: ${report.name || ""}
 Email: ${report.email || ""}
 Phone: ${report.phoneFormatted || report.phone || ""}
@@ -168,7 +178,7 @@ exports.sendGeneralRequest = onDocumentCreated(
     const request = event.data.data();
 
     await sendEmail({
-      to: MANAGER_EMAILS,
+      to: SUPERVISOR_EMAILS,
       subject: `Tool Checkout Request/Comment: ${request.type || "General Comment"}`,
       text:
 `A new request/comment was submitted from the Tool Checkout System.
@@ -312,7 +322,7 @@ Please return the tool or extend the checkout.`
       if (!checkout.lateNoticeSent && now >= overdueAt9) {
         await sendEmail({
           to: checkout.email,
-          cc: MANAGER_EMAILS,
+          cc: SUPERVISOR_EMAILS,
           subject: `OVERDUE TOOL: ${checkout.tool}`,
           text:
 `OVERDUE NOTICE: "${checkout.tool}" was not returned by the expected deadline.

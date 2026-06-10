@@ -1378,3 +1378,112 @@ tbody tr:hover {
   line-height: 1;
 
 }
+
+.tally-search-wrap {
+  border: 1px solid var(--border);
+  border-radius: 14px 14px 0 0;
+}
+
+.tally-tabs {
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.tally-tool-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  background: white;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+}
+
+.tally-tool-option {
+  width: 100%;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
+  color: var(--text);
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  transition: 0.16s ease;
+}
+
+.tally-tool-option:last-child {
+  border-bottom: none;
+}
+
+.tally-tool-option:hover {
+  background: #f8fafc;
+}
+
+.tally-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mini-status-btn,
+.mini-clear-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 0 12px;
+  min-height: 36px;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.mini-status-btn {
+  background: var(--orange);
+  color: white;
+}
+
+.mini-status-btn:hover {
+  background: var(--orange-dark);
+  transform: translateY(-1px);
+}
+
+.mini-clear-btn {
+  background: var(--success);
+  color: white;
+}
+
+.mini-clear-btn:hover {
+  background: #166534;
+  transform: translateY(-1px);
+}
+
+.damaged-tool {
+  background: #fee2e2 !important;
+  border-color: #fecaca !important;
+}
+
+.damaged-tool .tool-option-copy strong,
+.damaged-tool .tool-option-copy small {
+  color: #991b1b !important;
+}
+
+.tool-option.damaged-tool {
+  opacity: 0.9;
+}
+
+@media (max-width: 760px) {
+  .tally-tool-option {
+    grid-template-columns: 1fr;
+  }
+
+  .tally-actions {
+    justify-content: stretch;
+  }
+
+  .tally-actions button {
+    flex: 1;
+  }
+}
