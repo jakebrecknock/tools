@@ -1350,3 +1350,31 @@ tbody tr:hover {
     padding: 20px;
   }
 }
+
+.checkbox-row input[type="checkbox"] {
+
+  width: 18px;
+
+  height: 18px;
+
+  min-width: 18px;
+
+  flex: 0 0 18px;
+
+  accent-color: var(--orange);
+
+}
+
+.checkbox-row span {
+
+  flex: 1;
+
+  line-height: 1.25;
+
+}
+
+.placeholder-icon {
+
+  line-height: 1;
+
+}

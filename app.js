@@ -160,6 +160,11 @@ function makeReturnDate(dateValue) {
   return date.toISOString();
 }
 
+function dateInputFromISO(dateString) {
+  if (!dateString) return "";
+  return new Date(dateString).toISOString().split("T")[0];
+}
+
 function formatDate(dateString) {
   if (!dateString) return "";
   return new Date(dateString).toLocaleDateString(undefined, {
@@ -182,6 +187,19 @@ function formatDateTime(dateString) {
 
 function getCheckoutStartForDisplay(checkout) {
   return checkout.checkoutStartAt || checkout.checkedOutAt;
+}
+
+function getToolCategory(toolName) {
+  const found = tools.find(tool => tool.name === toolName);
+  return found?.category || "";
+}
+
+function getToolIcon(toolName) {
+  const category = getToolCategory(toolName);
+
+  if (category === "safetyEquipment") return "🦺";
+  if (category === "testingEquipment") return "🔌";
+  return "🧰";
 }
 
 function showView(viewName) {
@@ -240,8 +258,71 @@ async function seedDefaultToolsIfNeeded() {
   await Promise.all(writes);
 }
 
+function getActiveCheckouts() {
+  return checkouts.filter(checkout => checkout.status === "out");
+}
+
+function getScheduledCheckouts() {
+  return checkouts.filter(checkout => checkout.status === "scheduled");
+}
+
 function isToolCurrentlyOut(toolName) {
-  return checkouts.some(checkout => checkout.status === "out" && checkout.tool === toolName);
+  return getActiveCheckouts().some(checkout => checkout.tool === toolName);
+}
+
+function rangesOverlap(startA, endA, startB, endB) {
+  return startA < endB && endA > startB;
+}
+
+function getConflictingScheduledCheckout(toolName, startISO, endISO, ignoredCheckoutId = null) {
+  const start = new Date(startISO);
+  const end = new Date(endISO);
+
+  return getScheduledCheckouts()
+    .filter(checkout => checkout.tool === toolName && checkout.id !== ignoredCheckoutId)
+    .map(checkout => ({
+      checkout,
+      start: new Date(checkout.checkoutStartAt || checkout.checkedOutAt),
+      end: new Date(checkout.expectedReturnAt)
+    }))
+    .filter(item => rangesOverlap(start, end, item.start, item.end))
+    .sort((a, b) => a.start - b.start)[0]?.checkout || null;
+}
+
+function getLatestReturnBeforeConflict(toolName, startISO, requestedEndISO, ignoredCheckoutId = null) {
+  const conflict = getConflictingScheduledCheckout(toolName, startISO, requestedEndISO, ignoredCheckoutId);
+
+  if (!conflict) {
+    return {
+      hasConflict: false,
+      adjustedReturnAt: requestedEndISO,
+      conflict: null
+    };
+  }
+
+  const conflictStart = new Date(conflict.checkoutStartAt || conflict.checkedOutAt);
+  const adjusted = new Date(conflictStart);
+  adjusted.setDate(adjusted.getDate() - 1);
+  adjusted.setHours(17, 0, 0, 0);
+
+  const checkoutStart = new Date(startISO);
+
+  if (adjusted < checkoutStart) {
+    const sameDay = new Date(checkoutStart);
+    sameDay.setHours(17, 0, 0, 0);
+
+    return {
+      hasConflict: true,
+      adjustedReturnAt: sameDay.toISOString(),
+      conflict
+    };
+  }
+
+  return {
+    hasConflict: true,
+    adjustedReturnAt: adjusted.toISOString(),
+    conflict
+  };
 }
 
 function getVisibleTools() {
@@ -361,14 +442,6 @@ function renderAdminToolsList() {
   });
 }
 
-function getActiveCheckouts() {
-  return checkouts.filter(checkout => checkout.status === "out");
-}
-
-function getScheduledCheckouts() {
-  return checkouts.filter(checkout => checkout.status === "scheduled");
-}
-
 function refreshEverything() {
   document.getElementById("checkedOutCount").innerText = getActiveCheckouts().length;
   renderActiveCards();
@@ -407,7 +480,7 @@ function renderActiveCards() {
       <article class="component-card">
         <div class="placeholder-image">
           <div class="placeholder-box">
-            <div class="placeholder-icon">🧰</div>
+            <div class="placeholder-icon">${getToolIcon(checkout.tool)}</div>
             <div class="placeholder-label">${escapeHTML(checkout.tool)}</div>
           </div>
         </div>
@@ -470,7 +543,7 @@ function renderScheduledCards() {
       <article class="component-card scheduled-card">
         <div class="placeholder-image">
           <div class="placeholder-box">
-            <div class="placeholder-icon">📌</div>
+            <div class="placeholder-icon">📅</div>
             <div class="placeholder-label">${escapeHTML(checkout.tool)}</div>
           </div>
         </div>
@@ -656,8 +729,20 @@ async function confirmVerifiedAction() {
   if (pendingAction.action === "extend") {
     if (!newReturnDate.value) return;
 
+    const startISO = checkout.checkoutStartAt || checkout.checkedOutAt;
+    const requestedReturnAt = makeReturnDate(newReturnDate.value);
+    const conflictResult = getLatestReturnBeforeConflict(checkout.tool, startISO, requestedReturnAt, checkout.id);
+
+    if (conflictResult.hasConflict) {
+      newReturnDate.value = dateInputFromISO(conflictResult.adjustedReturnAt);
+
+      alert(
+        `This rental cannot be extended that long because ${checkout.tool} already has dibs starting ${formatDate(conflictResult.conflict.checkoutStartAt || conflictResult.conflict.checkedOutAt)}. The return date has been adjusted to the latest available date: ${formatDate(conflictResult.adjustedReturnAt)}.`
+      );
+    }
+
     await updateDoc(doc(db, "checkouts", checkout.id), {
-      expectedReturnAt: makeReturnDate(newReturnDate.value),
+      expectedReturnAt: conflictResult.adjustedReturnAt,
       reminder24Sent: false,
       reminderReturnDaySent: false,
       lateNoticeSent: false,
@@ -722,9 +807,9 @@ function renderEmailQueue() {
               <p class="muted"><strong>Start-day email:</strong> ${checkout.startDayEmailSent ? "Sent" : "Pending"}</p>
             `
             : `
-              <p class="muted"><strong>24h reminder:</strong> ${checkout.reminder24Sent ? "Sent" : "Pending"}</p>
-              <p class="muted"><strong>Return-day reminder:</strong> ${checkout.reminderReturnDaySent ? "Sent" : "Pending"}</p>
-              <p class="muted"><strong>Late notice:</strong> ${checkout.lateNoticeSent ? "Sent" : "Pending"}</p>
+              <p class="muted"><strong>Day-before reminder:</strong> ${checkout.reminder24Sent ? "Sent" : "Pending"}</p>
+              <p class="muted"><strong>Due-day reminder:</strong> ${checkout.reminderReturnDaySent ? "Sent" : "Pending"}</p>
+              <p class="muted"><strong>Overdue notice:</strong> ${checkout.lateNoticeSent ? "Sent" : "Pending"}</p>
             `
         }
       </div>
@@ -920,11 +1005,33 @@ checkoutForm.addEventListener("submit", async event => {
     ? makeScheduledStartDate(scheduledStartDate.value)
     : makeCheckoutDate();
 
-  const expectedReturnAt = makeReturnDate(expectedReturnDate.value);
+  let expectedReturnAt = makeReturnDate(expectedReturnDate.value);
 
   if (new Date(expectedReturnAt) <= new Date(checkoutStartAt)) {
     alert("Expected return date must be after the checkout start date.");
     return;
+  }
+
+  if (checkoutMode === "now") {
+    const conflictResult = getLatestReturnBeforeConflict(tool, checkoutStartAt, expectedReturnAt);
+
+    if (conflictResult.hasConflict) {
+      expectedReturnAt = conflictResult.adjustedReturnAt;
+      expectedReturnDate.value = dateInputFromISO(expectedReturnAt);
+
+      alert(
+        `${tool} has dibs starting ${formatDate(conflictResult.conflict.checkoutStartAt || conflictResult.conflict.checkedOutAt)}. This checkout is allowed, but it cannot be checked out that long. The return date has been adjusted to the latest available date: ${formatDate(expectedReturnAt)}.`
+      );
+    }
+  }
+
+  if (checkoutMode === "later") {
+    const scheduledConflict = getConflictingScheduledCheckout(tool, checkoutStartAt, expectedReturnAt);
+
+    if (scheduledConflict) {
+      alert(`${tool} already has dibs during that date range. Please choose a different date range.`);
+      return;
+    }
   }
 
   await addDoc(collection(db, "checkouts"), {

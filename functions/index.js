@@ -1,4 +1,4 @@
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
@@ -41,9 +41,7 @@ async function sendEmail({ to, cc, subject, text }) {
     text
   };
 
-  if (cc) {
-    message.cc = cc;
-  }
+  if (cc) message.cc = cc;
 
   await sgMail.send(message);
 }
@@ -84,20 +82,6 @@ You do not need to do anything else to confirm this reservation. Doing nothing k
 If you need to cancel it, open the Tool Checkout dashboard and cancel the scheduled checkout before it begins.`
       });
 
-      if (checkout.damageAtCheckout && checkout.damageComment) {
-        await sendEmail({
-          to: MANAGER_EMAILS,
-          subject: `Damage/Missing Item Reported on Scheduled Checkout: ${checkout.tool}`,
-          text:
-`Damage or missing items were reported while scheduling a checkout.
-
-${checkoutDetails(checkout)}
-
-Report:
-${checkout.damageComment}`
-        });
-      }
-
       return;
     }
 
@@ -107,27 +91,41 @@ ${checkout.damageComment}`
       text:
 `This confirms your ADB tool checkout.
 
-Tool: ${checkout.tool}
-Name: ${checkout.name}
-Phone: ${checkout.phoneFormatted}
-Expected Return: ${formatDate(new Date(checkout.expectedReturnAt))} by 5:00 PM
+${checkoutDetails(checkout)}
 
 Please return the tool on time or extend the rental before the return date.`
     });
+  }
+);
 
-    if (checkout.damageAtCheckout && checkout.damageComment) {
-      await sendEmail({
-        to: MANAGER_EMAILS,
-        subject: `Damage/Missing Item Reported at Checkout: ${checkout.tool}`,
-        text:
-`Damage or missing items were reported during checkout.
+exports.sendCheckoutUpdateConfirmation = onDocumentUpdated(
+  {
+    document: "checkouts/{checkoutId}",
+    secrets: [SENDGRID_API_KEY]
+  },
+  async event => {
+    sgMail.setApiKey(SENDGRID_API_KEY.value());
 
-${checkoutDetails(checkout)}
+    const before = event.data.before.data();
+    const after = event.data.after.data();
 
-Report:
-${checkout.damageComment}`
-      });
-    }
+    if (!before || !after) return;
+
+    const returnDateChanged = before.expectedReturnAt !== after.expectedReturnAt;
+    const stillOut = after.status === "out";
+
+    if (!returnDateChanged || !stillOut) return;
+
+    await sendEmail({
+      to: after.email,
+      subject: `Tool Rental Updated: ${after.tool}`,
+      text:
+`Your ADB tool rental has been updated.
+
+${checkoutDetails(after)}
+
+Your reminder emails will now follow this updated return date.`
+    });
   }
 );
 
@@ -216,7 +214,6 @@ exports.sendScheduledToolReminders = onSchedule(
       const ref = docSnap.ref;
 
       const start = new Date(checkout.checkoutStartAt || checkout.checkedOutAt);
-      const expected = new Date(checkout.expectedReturnAt);
 
       const scheduledReminder = new Date(start);
       scheduledReminder.setDate(scheduledReminder.getDate() - 1);
@@ -271,37 +268,40 @@ You are responsible for this tool while it is checked out in your name.`
 
       const expected = new Date(checkout.expectedReturnAt);
 
-      const reminder24 = new Date(expected);
-      reminder24.setDate(reminder24.getDate() - 1);
-      reminder24.setHours(17, 0, 0, 0);
+      const dayBeforeDueAt5 = new Date(expected);
+      dayBeforeDueAt5.setDate(dayBeforeDueAt5.getDate() - 1);
+      dayBeforeDueAt5.setHours(17, 0, 0, 0);
 
-      const returnDay = new Date(expected);
-      returnDay.setHours(9, 0, 0, 0);
+      const dueDayAt6 = new Date(expected);
+      dueDayAt6.setHours(6, 0, 0, 0);
 
-      const lateNotice = new Date(expected);
-      lateNotice.setDate(lateNotice.getDate() + 1);
-      lateNotice.setHours(9, 0, 0, 0);
+      const overdueAt9 = new Date(expected);
+      overdueAt9.setDate(overdueAt9.getDate() + 1);
+      overdueAt9.setHours(9, 0, 0, 0);
 
-      if (!checkout.reminder24Sent && now >= reminder24) {
+      if (!checkout.reminder24Sent && now >= dayBeforeDueAt5) {
         await sendEmail({
           to: checkout.email,
-          subject: `REMINDER: 24 hours to return ${checkout.tool}`,
+          subject: `REMINDER: ${checkout.tool} is due tomorrow`,
           text:
-`REMINDER: You have about 24 hours to return "${checkout.tool}" or extend the checkout.
+`REMINDER: "${checkout.tool}" is due back tomorrow by 5:00 PM.
 
-Tool: ${checkout.tool}
-Expected Return: ${formatDate(expected)} by 5:00 PM`
+${checkoutDetails(checkout)}
+
+Please return the tool on time or extend the checkout before it is due.`
         });
 
         updates.push(ref.update({ reminder24Sent: true }));
       }
 
-      if (!checkout.reminderReturnDaySent && now >= returnDay) {
+      if (!checkout.reminderReturnDaySent && now >= dueDayAt6) {
         await sendEmail({
           to: checkout.email,
           subject: `FINAL REMINDER: ${checkout.tool} is due today`,
           text:
 `FINAL REMINDER: "${checkout.tool}" is due back today by 5:00 PM.
+
+${checkoutDetails(checkout)}
 
 Please return the tool or extend the checkout.`
         });
@@ -309,19 +309,15 @@ Please return the tool or extend the checkout.`
         updates.push(ref.update({ reminderReturnDaySent: true }));
       }
 
-      if (!checkout.lateNoticeSent && now >= lateNotice) {
+      if (!checkout.lateNoticeSent && now >= overdueAt9) {
         await sendEmail({
           to: checkout.email,
           cc: MANAGER_EMAILS,
-          subject: `LATE NOTICE: ${checkout.tool} was not returned`,
+          subject: `OVERDUE TOOL: ${checkout.tool}`,
           text:
-`LATE NOTICE: "${checkout.tool}" was not returned by the expected deadline.
+`OVERDUE NOTICE: "${checkout.tool}" was not returned by the expected deadline.
 
-Tool: ${checkout.tool}
-Checked Out By: ${checkout.name}
-Worker Email: ${checkout.email}
-Phone: ${checkout.phoneFormatted}
-Expected Return: ${formatDate(expected)} by 5:00 PM
+${checkoutDetails(checkout)}
 
 Please return this tool immediately or update the checkout.`
         });
